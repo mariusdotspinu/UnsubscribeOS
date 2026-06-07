@@ -1,0 +1,14 @@
+/* Dark palette — calm black & blue. Defines looked-up colors consumed by app.css. */
+.root {
+    -bg:           #0d1117;
+    -bg-elevated:  #161b22;
+    -surface:      #1c2330;
+    -surface-hover:#232c3d;
+    -border:       #2b3442;
+    -text:         #e6edf3;
+    -text-muted:   #8b97a7;
+    -accent:       #4f8cff;
+    -accent-soft:  #1b2a47;
+    -danger:       #ff6b6b;
+    -on-accent:    #ffffff;
+}

@@ -1,0 +1,14 @@
+/* Light palette — calm white & blue. Defines looked-up colors consumed by app.css. */
+.root {
+    -bg:           #f6f8fb;
+    -bg-elevated:  #ffffff;
+    -surface:      #ffffff;
+    -surface-hover:#eef2f8;
+    -border:       #dde3ec;
+    -text:         #14181f;
+    -text-muted:   #5b6675;
+    -accent:       #2f6bff;
+    -accent-soft:  #e6eeff;
+    -danger:       #d64545;
+    -on-accent:    #ffffff;
+}
