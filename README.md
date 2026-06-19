@@ -42,11 +42,9 @@ It is deliberately a **desktop** application, not a web service: your credential
 
 ## Screenshots
 
-> _Add screenshots to `docs/` and reference them here._
->
-> | Provider screen | Credentials | Dashboard |
-> |---|---|---|
-> | `docs/provider.png` | `docs/credentials.png` | `docs/dashboard.png` |
+| Provider screen | Dashboard |
+|---|---|
+| ![Provider selection screen](docs/provider-screen.png) | ![Dashboard grouping senders by domain](docs/dashboard.png) |
 
 ---
 
@@ -177,42 +175,9 @@ Sign-in uses the **OAuth 2.0 Authorization Code flow with PKCE** and a temporary
 
 The codebase is split into a UI-agnostic **core** and a thin **JavaFX UI**. The UI depends on the core through small interfaces and services; the core never depends on JavaFX.
 
-```mermaid
-flowchart TD
-    subgraph UI["ui  (JavaFX)"]
-        Launcher --> Router
-        Router --> ProviderView & CredentialsView & DashboardView
-        DashboardView --> DomainGrid --> DomainCard
-        UIcompA["component/* — Ui, Toast, Modal, ProviderLogo, AppIcon, ThemeToggle, Tutorial, HeatScale"]
-        AppContext["AppContext (DI record)"]
-    end
+[![Architecture diagram](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/architecture.puml)](docs/architecture.puml)
 
-    subgraph Core["core  (no JavaFX)"]
-        AuthService --> AccountStore
-        AuthService --> LoopbackOAuth --> Pkce
-        AccountStore -.impl.-> EncryptedAccountStore --> Aes
-        MailService["MailService (interface)"]
-        MailServiceFactory --> GmailService & OutlookService
-        GmailService & OutlookService --> ConcurrentFetcher
-        GmailService & OutlookService --> Http
-        DomainAggregator
-        UnsubscribeService --> Http
-        UnsubscribeService --> Browser
-    end
-
-    subgraph Config["config"]
-        ProviderConfigs
-        AppPaths
-        Settings
-    end
-
-    DashboardView --> MailServiceFactory
-    DashboardView --> DomainAggregator
-    CredentialsView --> AuthService
-    DashboardView --> UnsubscribeService
-    AuthService --> ProviderConfigs
-    EncryptedAccountStore --> AppPaths
-```
+<sub>Rendered from [`docs/architecture.puml`](docs/architecture.puml) via the PlantUML server.</sub>
 
 ### Layers & packages
 
@@ -250,65 +215,15 @@ Plus: **SOLID & small units** (adding a provider = one impl + one factory entry 
 
 #### 1. Startup & stay-signed-in
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant L as Launcher
-    participant A as AuthService
-    participant S as EncryptedAccountStore
-    L->>L: build scene, show ProviderView
-    L->>A: restore() for each provider (async, off-UI)
-    A->>S: load encrypted account
-    alt saved session found
-        A->>A: refresh token if expired
-        A-->>L: Account
-        L->>L: Router → DashboardView
-    else none
-        L-->>U: stay on ProviderView
-    end
-```
+[![Startup & stay-signed-in sequence](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/flow-startup.puml)](docs/flow-startup.puml)
 
 #### 2. Sign-in (OAuth + PKCE, loopback)
 
-```mermaid
-sequenceDiagram
-    participant V as CredentialsView
-    participant A as AuthService
-    participant O as LoopbackOAuth
-    participant B as Browser
-    participant P as Provider (Google/Microsoft)
-    V->>A: signIn(provider, clientId, secret, remember)
-    A->>O: authorize(config)
-    O->>O: start loopback server, build PKCE challenge
-    O->>B: open consent URL in default browser
-    B->>P: user logs in & consents
-    P-->>O: redirect with auth code
-    O->>P: exchange code + verifier → tokens
-    O-->>A: TokenSet
-    A->>A: store encrypted account (+ creds if "Remember me")
-    A-->>V: Account → Router → DashboardView
-```
+[![Sign-in (OAuth + PKCE, loopback) sequence](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/flow-signin.puml)](docs/flow-signin.puml)
 
 #### 3. Fetch, group & live-poll
 
-```mermaid
-sequenceDiagram
-    participant D as DashboardView
-    participant M as MailService (Gmail/Outlook)
-    participant F as ConcurrentFetcher
-    participant G as DomainAggregator
-    D->>M: fetch(token, depth, ctx) on a virtual thread
-    M->>M: list received-mail IDs newest-first (paged, up to depth)
-    M->>F: fetch each message concurrently (≤12 in flight)
-    F-->>D: onMessage(EmailMessage) — keep only automated/bulk mail (personal dropped)
-    F-->>D: onProgress(x / y) — live progress bar
-    loop every 250ms while fetching
-        D->>G: group kept messages by domain
-        G-->>D: domains (busiest first)
-        D->>D: apply search + sort + heat colour → render cards
-    end
-    Note over D,M: After the first load, poll every 5s (shallow);<br/>ctx.shouldFetch skips already-seen IDs (cheap)
-```
+[![Fetch, group & live-poll sequence](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/flow-fetch.puml)](docs/flow-fetch.puml)
 
 **Mail scope.** The scan reads your received mail newest-first — Gmail via `q = -in:sent -in:chats`, Outlook via Graph `$orderby=receivedDateTime desc` — and **keeps only automated / bulk senders**: those whose messages carry a standard list or automation header (`List-Unsubscribe`, `List-Id`, `List-Post`, `Precedence: bulk/list`, `Auto-Submitted`). Personal mail — what you wrote, and the replies people send back — has none of these, so it never appears or becomes deletable; this also catches bulk senders regardless of language or which inbox tab they land in. Senders exposing `List-Unsubscribe` get an **unsubscribe** button; the rest are **delete-only**. How many of the newest messages are scanned is **configurable** (toolbar dropdown, default 5,000, persisted as `scan.depth`); to stay responsive the 5-second poll only re-lists the newest few hundred to pick up new arrivals.
 
