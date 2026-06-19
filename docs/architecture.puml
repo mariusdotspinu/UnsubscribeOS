@@ -1,0 +1,72 @@
+@startuml architecture
+title UnsubscribeOS — architecture (ui → core → config)
+skinparam componentStyle rectangle
+skinparam shadowing false
+left to right direction
+
+package "ui  (JavaFX)" {
+  component Launcher
+  component Router
+  component ProviderView
+  component CredentialsView
+  component DashboardView
+  component DomainGrid
+  component DomainCard
+  component "AppContext (DI record)" as AppContext
+  component "component/* — Ui, Toast, Modal,\nProviderLogo, AppIcon, ThemeToggle,\nTutorial, HeatScale" as UIComponents
+}
+
+package "core  (no JavaFX)" {
+  component AuthService
+  interface AccountStore
+  component EncryptedAccountStore
+  component Aes
+  component Pkce
+  component LoopbackOAuth
+  interface MailService
+  component MailServiceFactory
+  component GmailService
+  component OutlookService
+  component ConcurrentFetcher
+  component DomainAggregator
+  component UnsubscribeService
+  component Http
+  component Browser
+}
+
+package "config" {
+  component ProviderConfigs
+  component AppPaths
+  component Settings
+}
+
+Launcher --> Router
+Router --> ProviderView
+Router --> CredentialsView
+Router --> DashboardView
+DashboardView --> DomainGrid
+DomainGrid --> DomainCard
+
+AuthService --> AccountStore
+AuthService --> LoopbackOAuth
+LoopbackOAuth --> Pkce
+AccountStore <|.. EncryptedAccountStore : impl
+EncryptedAccountStore --> Aes
+MailServiceFactory --> GmailService
+MailServiceFactory --> OutlookService
+GmailService ..|> MailService
+OutlookService ..|> MailService
+GmailService --> ConcurrentFetcher
+OutlookService --> ConcurrentFetcher
+GmailService --> Http
+OutlookService --> Http
+UnsubscribeService --> Http
+UnsubscribeService --> Browser
+
+DashboardView --> MailServiceFactory
+DashboardView --> DomainAggregator
+CredentialsView --> AuthService
+DashboardView --> UnsubscribeService
+AuthService --> ProviderConfigs
+EncryptedAccountStore --> AppPaths
+@enduml

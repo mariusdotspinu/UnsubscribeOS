@@ -1,0 +1,23 @@
+@startuml flow-fetch
+title Fetch, group & live-poll
+skinparam shadowing false
+participant DashboardView as D
+participant "MailService (Gmail/Outlook)" as M
+participant ConcurrentFetcher as F
+participant DomainAggregator as G
+
+D -> M : fetch(token, depth, ctx) on a virtual thread
+M -> M : list received-mail IDs newest-first (paged, up to depth)
+M -> F : fetch each message concurrently (≤12 in flight)
+F --> D : onMessage(EmailMessage) — keep only automated/bulk mail (personal dropped)
+F --> D : onProgress(x / y) — live progress bar
+loop every 250ms while fetching
+  D -> G : group kept messages by domain
+  G --> D : domains (busiest first)
+  D -> D : apply search + sort + heat colour → render cards
+end
+note over D, M
+  After the first load, poll every 5s (shallow);
+  ctx.shouldFetch skips already-seen IDs (cheap)
+end note
+@enduml

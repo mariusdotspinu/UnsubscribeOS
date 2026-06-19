@@ -1,0 +1,19 @@
+@startuml flow-startup
+title Startup & stay-signed-in
+skinparam shadowing false
+actor User as U
+participant Launcher as L
+participant AuthService as A
+participant EncryptedAccountStore as S
+
+L -> L : build scene, show ProviderView
+L -> A : restore() for each provider (async, off-UI)
+A -> S : load encrypted account
+alt saved session found
+  A -> A : refresh token if expired
+  A --> L : Account
+  L -> L : Router → DashboardView
+else none
+  L --> U : stay on ProviderView
+end
+@enduml

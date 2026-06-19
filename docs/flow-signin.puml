@@ -1,0 +1,20 @@
+@startuml flow-signin
+title Sign-in (OAuth + PKCE, loopback)
+skinparam shadowing false
+participant CredentialsView as V
+participant AuthService as A
+participant LoopbackOAuth as O
+participant Browser as B
+participant "Provider (Google/Microsoft)" as P
+
+V -> A : signIn(provider, clientId, secret, remember)
+A -> O : authorize(config)
+O -> O : start loopback server, build PKCE challenge
+O -> B : open consent URL in default browser
+B -> P : user logs in & consents
+P --> O : redirect with auth code
+O -> P : exchange code + verifier → tokens
+O --> A : TokenSet
+A -> A : store encrypted account (+ creds if "Remember me")
+A --> V : Account → Router → DashboardView
+@enduml
