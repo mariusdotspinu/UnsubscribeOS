@@ -416,13 +416,6 @@ UI screens are thin and delegate to tested core/services; OAuth and live API cal
 Issues and pull requests are welcome. Please keep the style of the codebase: small classes, records for data, functional/stream-based logic, and tests for new core logic. Run `mvn test` before submitting.
 
 ---
-
-## License
-
-This project is intended to be open source. Add a `LICENSE` file with your chosen license (**MIT** is recommended for maximum reuse) and update this section accordingly.
-
----
-
 <div align="center">
 Made for calmer inboxes. 📭
 </div>
