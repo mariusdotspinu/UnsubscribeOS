@@ -14,8 +14,8 @@ import java.util.Optional;
 public abstract class AbstractMailService implements MailService {
 
     @Override
-    public final void fetch(String accessToken, FetchContext context) {
-        List<String> ids = listMessageIds(accessToken, context);
+    public final void fetch(String accessToken, int maxMessages, FetchContext context) {
+        List<String> ids = listMessageIds(accessToken, maxMessages, context);
         ConcurrentFetcher.fetchAll(ids, id -> fetchMessage(accessToken, id), context);
     }
 
@@ -26,8 +26,8 @@ public abstract class AbstractMailService implements MailService {
         }
     }
 
-    /** Lists the ids of the messages in scope (bulk/marketing mail), paging as needed. */
-    protected abstract List<String> listMessageIds(String accessToken, FetchContext context);
+    /** Lists the ids of the messages in scope (bulk/marketing mail), paging up to {@code maxMessages}. */
+    protected abstract List<String> listMessageIds(String accessToken, int maxMessages, FetchContext context);
 
     /** Fetches and parses a single message, or empty if it can't be read. */
     protected abstract Optional<EmailMessage> fetchMessage(String accessToken, String id);

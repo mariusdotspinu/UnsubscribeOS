@@ -40,31 +40,32 @@ public final class UnsubscribeService {
 
     private Optional<UnsubscribeResult> oneClickStrategy(UnsubscribeInfo info) {
         if (!info.oneClick()) return Optional.empty();
-        return info.firstHttpUrl().map(this::oneClick);
+        return info.firstHttpUrl().map(url -> oneClick(url, info.domain()));
     }
 
     private Optional<UnsubscribeResult> browserStrategy(UnsubscribeInfo info) {
-        return info.firstHttpUrl().map(url -> open(url,
-                UnsubscribeResult.Status.OPENED_BROWSER, "Opened the unsubscribe page in your browser."));
+        return info.firstHttpUrl().map(url -> open(url, UnsubscribeResult.Status.OPENED_BROWSER,
+                "Opened the unsubscribe page for " + info.domain() + " in your browser."));
     }
 
     private Optional<UnsubscribeResult> mailtoStrategy(UnsubscribeInfo info) {
-        return info.firstMailto().map(uri -> open(uri,
-                UnsubscribeResult.Status.OPENED_MAIL, "Opened a pre-filled unsubscribe email."));
+        return info.firstMailto().map(uri -> open(uri, UnsubscribeResult.Status.OPENED_MAIL,
+                "Opened a pre-filled unsubscribe email for " + info.domain() + "."));
     }
 
     // ---- execution ----------------------------------------------------------
 
-    private UnsubscribeResult oneClick(String url) {
+    private UnsubscribeResult oneClick(String url, String domain) {
         try {
             int code = Http.postRaw(url, FORM_TYPE, ONE_CLICK_BODY);
             return code >= 200 && code < 400
-                    ? UnsubscribeResult.of(UnsubscribeResult.Status.ONE_CLICK, "Unsubscribed in one click.")
+                    ? UnsubscribeResult.of(UnsubscribeResult.Status.ONE_CLICK,
+                            "Unsubscribed from " + domain + " in one click.")
                     : open(url, UnsubscribeResult.Status.OPENED_BROWSER,
-                            "Couldn't auto-unsubscribe (HTTP " + code + ") — opened the page instead.");
+                            "Couldn't auto-unsubscribe from " + domain + " (HTTP " + code + ") — opened the page instead.");
         } catch (RuntimeException e) {
             return open(url, UnsubscribeResult.Status.OPENED_BROWSER,
-                    "Couldn't auto-unsubscribe — opened the page instead.");
+                    "Couldn't auto-unsubscribe from " + domain + " — opened the page instead.");
         }
     }
 

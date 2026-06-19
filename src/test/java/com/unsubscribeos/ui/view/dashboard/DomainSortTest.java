@@ -20,7 +20,7 @@ class DomainSortTest {
         List<EmailMessage> messages = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             messages.add(new EmailMessage(name + i, "n", "n@" + name, name, "s", "snip",
-                    Instant.EPOCH, Optional.empty()));
+                    Instant.EPOCH, Optional.empty(), true));
         }
         return new MailDomain(name, messages);
     }

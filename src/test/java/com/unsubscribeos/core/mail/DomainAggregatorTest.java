@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DomainAggregatorTest {
 
     private static EmailMessage msg(String id, String domain, Instant date) {
-        return new EmailMessage(id, "Sender", "s@" + domain, domain, "Subject " + id, "snippet", date, Optional.empty());
+        return new EmailMessage(id, "Sender", "s@" + domain, domain, "Subject " + id, "snippet", date, Optional.empty(), true);
     }
 
     @Test

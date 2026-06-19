@@ -52,6 +52,7 @@ final class DomainCard {
     private final Region heat = new Region();
     private final Label countBadge = Ui.label("", "count-badge");
     private final Button moreButton = Ui.button("Show more", this::showMore, "ghost");
+    private final Button unsubscribeButton = Ui.icon("🔕", "Unsubscribe from this sender", this::unsubscribe, "warning");
 
     DomainCard(AppContext context, Account account, MailService mail, String domain,
                Notifier notifier, Consumer<List<String>> purge, Runnable onRemoved) {
@@ -90,6 +91,11 @@ final class DomainCard {
         countBadge.getStyleClass().removeIf(c -> c.startsWith("vol-"));
         countBadge.getStyleClass().add(heatClass.replace("heat", "vol"));
 
+        // Only senders that actually offer an unsubscribe get the button; the rest are delete-only.
+        boolean canUnsubscribe = snapshot.bestUnsubscribe().isPresent();
+        unsubscribeButton.setVisible(canUnsubscribe);
+        unsubscribeButton.setManaged(canUnsubscribe);
+
         if (expanded) renderRows();
     }
 
@@ -101,9 +107,8 @@ final class DomainCard {
         info.setOnMouseClicked(e -> toggle());
         HBox.setHgrow(info, Priority.ALWAYS);
 
-        Button unsubscribe = Ui.icon("🔕", "Unsubscribe from this sender", this::unsubscribe);
-        Button delete = Ui.icon("🗑", "Delete all emails from this sender", this::deleteDomain, "danger");
-        return Ui.row(6, Pos.CENTER_LEFT, info, unsubscribe, delete);
+        Button delete = Ui.icon("✕", "Delete all emails from this sender", this::deleteDomain, "danger");
+        return Ui.row(6, Pos.CENTER_LEFT, info, unsubscribeButton, delete);
     }
 
     private void toggle() {
@@ -117,8 +122,17 @@ final class DomainCard {
     // ---- email rows ---------------------------------------------------------
 
     private void showMore() {
+        int from = Math.min(shown, messages.size());
         shown = Math.min(shown + PAGE, messages.size());
-        renderRows();
+        int to = Math.min(shown, messages.size());
+        // Insert the freshly revealed rows before the "Show more" button without removing it, then
+        // drop the button once the last row is shown. (The scrollbar is kept steady globally by the
+        // dashboard's scroll keeper.)
+        List<Node> newRows = new ArrayList<>();
+        for (int i = from; i < to; i++) newRows.add(emailRow(messages.get(i)));
+        int insertAt = emailBox.getChildren().indexOf(moreButton);
+        emailBox.getChildren().addAll(insertAt < 0 ? emailBox.getChildren().size() : insertAt, newRows);
+        if (to >= messages.size()) emailBox.getChildren().remove(moreButton);
     }
 
     private void renderRows() {
@@ -133,7 +147,7 @@ final class DomainCard {
         VBox text = new VBox(2, Ui.label(message.subject(), "email-subject"), Ui.label(message.snippet(), "email-snippet"));
         HBox.setHgrow(text, Priority.ALWAYS);
         HBox row = Ui.row(10, Pos.CENTER_LEFT, text, Ui.grow());
-        row.getChildren().add(Ui.icon("🗑", "Delete this email", () -> deleteEmail(message), "danger", "ghost"));
+        row.getChildren().add(Ui.icon("✕", "Delete this email", () -> deleteEmail(message), "danger"));
         row.getStyleClass().add("email-row");
         return row;
     }
@@ -173,7 +187,7 @@ final class DomainCard {
                 () -> {
                     purge.accept(ids);
                     onDeleted.run();
-                    notifier.success("Moved " + ids.size() + " email(s) to Trash.");
+                    notifier.success("Moved " + ids.size() + " email(s) from " + domain + " to Trash.");
                 },
                 error -> notifier.error("Delete failed: " + Errors.describe(error)));
     }

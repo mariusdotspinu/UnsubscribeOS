@@ -37,7 +37,8 @@ public final class Launcher extends Application {
     public void start(Stage stage) {
         Settings settings = new Settings();
         AuthService authService = new AuthService(new EncryptedAccountStore());
-        AppContext context = new AppContext(authService, new UnsubscribeService(), new ThemeManager(settings));
+        AppContext context = new AppContext(
+                authService, new UnsubscribeService(), new ThemeManager(settings), settings);
 
         Scene scene = new Scene(new Region(), WIDTH, HEIGHT);
         context.themeManager().attach(scene);

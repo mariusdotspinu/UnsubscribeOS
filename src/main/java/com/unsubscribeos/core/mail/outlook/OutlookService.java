@@ -5,14 +5,15 @@ import com.unsubscribeos.core.http.Http;
 import com.unsubscribeos.core.http.Json;
 import com.unsubscribeos.core.mail.AbstractMailService;
 import com.unsubscribeos.core.mail.Addresses;
+import com.unsubscribeos.core.mail.BulkMail;
 import com.unsubscribeos.core.mail.FetchContext;
 import com.unsubscribeos.core.mail.UnsubscribeHeaders;
 import com.unsubscribeos.core.model.EmailMessage;
 import com.unsubscribeos.core.model.Provider;
-import com.unsubscribeos.core.model.UnsubscribeInfo;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,10 +28,11 @@ public final class OutlookService extends AbstractMailService {
 
     private static final String ROOT = "https://graph.microsoft.com/v1.0";
     private static final String MESSAGES = ROOT + "/me/messages";
-    private static final int MAX_MESSAGES = 1500;
     private static final int PAGE_SIZE = 100;
     private static final int BATCH_LIMIT = 20;
-    private static final String SEARCH = "\"unsubscribe\"";
+    // List all mail newest-first; the dashboard keeps only senders that expose a List-Unsubscribe
+    // header. ($orderby can't be combined with $search, so we drop the keyword filter entirely.)
+    private static final String ORDER_BY = "receivedDateTime desc";
     private static final String SELECT = "id,subject,bodyPreview,from,receivedDateTime,internetMessageHeaders";
 
     @Override
@@ -49,15 +51,15 @@ public final class OutlookService extends AbstractMailService {
     }
 
     @Override
-    protected List<String> listMessageIds(String accessToken, FetchContext ctx) {
+    protected List<String> listMessageIds(String accessToken, int maxMessages, FetchContext ctx) {
         List<String> ids = new ArrayList<>();
-        String url = MESSAGES + "?$search=" + Http.enc(SEARCH) + "&$select=id&$top=" + PAGE_SIZE;
-        while (url != null && ids.size() < MAX_MESSAGES && !ctx.isCancelled()) {
+        String url = MESSAGES + "?$orderby=" + Http.enc(ORDER_BY) + "&$select=id&$top=" + PAGE_SIZE;
+        while (url != null && ids.size() < maxMessages && !ctx.isCancelled()) {
             JsonNode page = Json.parse(Http.get(url, accessToken));
             page.path("value").forEach(m -> ids.add(m.path("id").asText()));
             url = page.path("@odata.nextLink").asText(null);
         }
-        return ids.size() > MAX_MESSAGES ? ids.subList(0, MAX_MESSAGES) : ids;
+        return ids.size() > maxMessages ? ids.subList(0, maxMessages) : ids;
     }
 
     @Override
@@ -70,25 +72,24 @@ public final class OutlookService extends AbstractMailService {
         JsonNode from = node.path("from").path("emailAddress");
         String address = from.path("address").asText("").toLowerCase();
         String name = from.path("name").asText(address);
+        var domain = Addresses.parseFrom(name + " <" + address + ">").domain();
+        Map<String, String> headers = headerMap(node.path("internetMessageHeaders"));
         return new EmailMessage(
                 node.path("id").asText(),
                 name,
                 address,
-                Addresses.parseFrom(name + " <" + address + ">").domain(),
+                domain,
                 node.path("subject").asText("(no subject)"),
                 node.path("bodyPreview").asText(""),
                 parseDate(node.path("receivedDateTime").asText(null)),
-                parseHeaders(node.path("internetMessageHeaders")));
+                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), domain),
+                BulkMail.isBulk(headers));
     }
 
-    private Optional<UnsubscribeInfo> parseHeaders(JsonNode headers) {
-        String listUnsub = null, listUnsubPost = null;
-        for (JsonNode h : headers) {
-            String name = h.path("name").asText().toLowerCase();
-            if (name.equals("list-unsubscribe")) listUnsub = h.path("value").asText();
-            else if (name.equals("list-unsubscribe-post")) listUnsubPost = h.path("value").asText();
-        }
-        return UnsubscribeHeaders.parse(listUnsub, listUnsubPost);
+    private Map<String, String> headerMap(JsonNode headers) {
+        Map<String, String> map = new HashMap<>();
+        for (JsonNode h : headers) map.put(h.path("name").asText().toLowerCase(), h.path("value").asText());
+        return map;
     }
 
     private Instant parseDate(String iso) {

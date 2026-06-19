@@ -5,6 +5,7 @@ import com.unsubscribeos.core.http.Http;
 import com.unsubscribeos.core.http.Json;
 import com.unsubscribeos.core.mail.AbstractMailService;
 import com.unsubscribeos.core.mail.Addresses;
+import com.unsubscribeos.core.mail.BulkMail;
 import com.unsubscribeos.core.mail.FetchContext;
 import com.unsubscribeos.core.mail.UnsubscribeHeaders;
 import com.unsubscribeos.core.model.EmailMessage;
@@ -26,11 +27,13 @@ import java.util.Optional;
 public final class GmailService extends AbstractMailService {
 
     private static final String BASE = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
-    private static final String QUERY = "category:promotions OR category:updates OR unsubscribe";
-    private static final int MAX_MESSAGES = 1500;
+    // Scan all received mail (spam/trash are excluded by default; skip your own sent/chat mail).
+    // We no longer pre-filter to "promotions/unsubscribe" here — the dashboard keeps only senders
+    // that actually expose a List-Unsubscribe header, which catches bulk mail Gmail filed elsewhere.
+    private static final String QUERY = "-in:sent -in:chats";
     private static final int BATCH_LIMIT = 1000;
-    private static final List<String> HEADERS =
-            List.of("From", "Subject", "List-Unsubscribe", "List-Unsubscribe-Post", "Date");
+    private static final List<String> HEADERS = List.of("From", "Subject", "Date",
+            "List-Unsubscribe", "List-Unsubscribe-Post", "List-Id", "List-Post", "Precedence", "Auto-Submitted");
 
     @Override
     public Provider provider() {
@@ -49,7 +52,7 @@ public final class GmailService extends AbstractMailService {
     }
 
     @Override
-    protected List<String> listMessageIds(String accessToken, FetchContext ctx) {
+    protected List<String> listMessageIds(String accessToken, int maxMessages, FetchContext ctx) {
         List<String> ids = new ArrayList<>();
         String pageToken = null;
         do {
@@ -59,8 +62,8 @@ public final class GmailService extends AbstractMailService {
             JsonNode page = Json.parse(Http.get(url, accessToken));
             page.path("messages").forEach(m -> ids.add(m.path("id").asText()));
             pageToken = page.path("nextPageToken").asText(null);
-        } while (pageToken != null && ids.size() < MAX_MESSAGES);
-        return ids.size() > MAX_MESSAGES ? ids.subList(0, MAX_MESSAGES) : ids;
+        } while (pageToken != null && ids.size() < maxMessages);
+        return ids.size() > maxMessages ? ids.subList(0, maxMessages) : ids;
     }
 
     @Override
@@ -81,7 +84,8 @@ public final class GmailService extends AbstractMailService {
                 headers.getOrDefault("subject", "(no subject)"),
                 node.path("snippet").asText(""),
                 Instant.ofEpochMilli(node.path("internalDate").asLong(0)),
-                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post")));
+                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), sender.domain()),
+                BulkMail.isBulk(headers));
     }
 
     private Map<String, String> headerMap(JsonNode headers) {

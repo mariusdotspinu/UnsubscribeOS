@@ -13,13 +13,13 @@ class MailDomainTest {
 
     private static EmailMessage withUnsubscribe(String id, UnsubscribeInfo info) {
         return new EmailMessage(id, "S", "s@x.com", "x.com", "subj", "snip",
-                Instant.ofEpochSecond(1), Optional.ofNullable(info));
+                Instant.ofEpochSecond(1), Optional.ofNullable(info), info != null);
     }
 
     @Test
     void bestUnsubscribePrefersOneClick() {
-        UnsubscribeInfo plain = new UnsubscribeInfo(List.of("https://a"), List.of(), false);
-        UnsubscribeInfo oneClick = new UnsubscribeInfo(List.of("https://b"), List.of(), true);
+        UnsubscribeInfo plain = new UnsubscribeInfo(List.of("https://a"), List.of(), false, "x.com");
+        UnsubscribeInfo oneClick = new UnsubscribeInfo(List.of("https://b"), List.of(), true, "x.com");
         MailDomain domain = new MailDomain("x.com", List.of(
                 withUnsubscribe("1", plain), withUnsubscribe("2", oneClick)));
 

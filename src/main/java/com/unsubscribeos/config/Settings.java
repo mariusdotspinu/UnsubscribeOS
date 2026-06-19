@@ -11,6 +11,11 @@ import java.util.Properties;
 /** Tiny key/value preferences backed by {@code settings.properties} (theme, last provider). */
 public final class Settings {
 
+    /** How many newest messages the initial mailbox scan reads (see {@link #scanDepth()}). */
+    public static final String SCAN_DEPTH = "scan.depth";
+    public static final int DEFAULT_SCAN_DEPTH = 5000;
+    private static final int MIN_SCAN_DEPTH = 100;
+
     private final Properties props = new Properties();
     private final Path file = AppPaths.settings();
 
@@ -20,6 +25,24 @@ public final class Settings {
 
     public Optional<String> get(String key) {
         return Optional.ofNullable(props.getProperty(key));
+    }
+
+    /**
+     * Newest messages to scan on the initial fetch. Higher finds more senders but scans longer.
+     * Tunable by editing {@code scan.depth} in settings.properties; falls back to the default when
+     * unset or unparseable, and is floored so a typo can't disable scanning entirely.
+     */
+    public int scanDepth() {
+        return get(SCAN_DEPTH)
+                .map(String::trim)
+                .map(value -> {
+                    try {
+                        return Math.max(MIN_SCAN_DEPTH, Integer.parseInt(value));
+                    } catch (NumberFormatException e) {
+                        return DEFAULT_SCAN_DEPTH;
+                    }
+                })
+                .orElse(DEFAULT_SCAN_DEPTH);
     }
 
     public void put(String key, String value) {

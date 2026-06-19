@@ -19,21 +19,32 @@ public final class UnsubscribeHeaders {
 
     private UnsubscribeHeaders() {}
 
-    public static Optional<UnsubscribeInfo> parse(String listUnsubscribe, String listUnsubscribePost) {
+    public static Optional<UnsubscribeInfo> parse(String listUnsubscribe, String listUnsubscribePost, String domain) {
         if (listUnsubscribe == null || listUnsubscribe.isBlank()) return Optional.empty();
 
         List<String> http = new ArrayList<>();
         List<String> mailto = new ArrayList<>();
         Matcher m = URI.matcher(listUnsubscribe);
+        boolean bracketed = false;
         while (m.find()) {
-            String uri = m.group(1).trim();
-            if (uri.regionMatches(true, 0, "mailto:", 0, 7)) mailto.add(uri);
-            else if (uri.regionMatches(true, 0, "http", 0, 4)) http.add(uri);
+            bracketed = true;
+            classify(m.group(1).trim(), http, mailto);
+        }
+        // Some senders ignore RFC 2369 and omit the angle brackets, sending a bare or
+        // comma-separated value (e.g. "List-Unsubscribe: https://…, mailto:…"). Without this
+        // fallback those senders would look like they offer no unsubscribe option at all.
+        if (!bracketed) {
+            for (String token : listUnsubscribe.split("[,\\s]+")) classify(token.trim(), http, mailto);
         }
         if (http.isEmpty() && mailto.isEmpty()) return Optional.empty();
 
         boolean oneClick = listUnsubscribePost != null
                 && listUnsubscribePost.toLowerCase().contains("one-click");
-        return Optional.of(new UnsubscribeInfo(List.copyOf(http), List.copyOf(mailto), oneClick));
+        return Optional.of(new UnsubscribeInfo(List.copyOf(http), List.copyOf(mailto), oneClick, domain));
+    }
+
+    private static void classify(String uri, List<String> http, List<String> mailto) {
+        if (uri.regionMatches(true, 0, "mailto:", 0, 7)) mailto.add(uri);
+        else if (uri.regionMatches(true, 0, "http", 0, 4)) http.add(uri);
     }
 }

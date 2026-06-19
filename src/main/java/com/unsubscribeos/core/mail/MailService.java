@@ -13,8 +13,11 @@ public interface MailService {
 
     Provider provider();
 
-    /** Streams recent messages to the context's callbacks. Blocking — run off the UI thread. */
-    void fetch(String accessToken, FetchContext context);
+    /**
+     * Streams recent messages to the context's callbacks, scanning at most {@code maxMessages}
+     * (newest first). Blocking — run off the UI thread.
+     */
+    void fetch(String accessToken, int maxMessages, FetchContext context);
 
     /** Moves the given messages to the provider's trash/deleted folder (recoverable). */
     void delete(String accessToken, List<String> messageIds);

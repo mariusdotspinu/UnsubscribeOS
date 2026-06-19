@@ -21,7 +21,7 @@ It is deliberately a **desktop** application, not a web service: your credential
 ### Why another unsubscriber?
 
 - **Privacy-first.** Everything runs locally. The app talks only to Google/Microsoft, directly, using OAuth credentials *you* create. Tokens are stored encrypted on disk.
-- **Safe by design.** Only bulk/marketing mail is shown, so personal email stays out of reach of the bulk-delete button. Deletions go to **Trash** (recoverable), not permanent deletion.
+- **Safe by design.** Only automated/bulk senders (newsletters, notifications, receipts) are shown — detected via standard list/automation headers — so personal mail you wrote or received stays out of reach of the bulk-delete button. Deletions go to **Trash** (recoverable), not permanent deletion.
 - **Calm & focused.** A single, quiet dashboard: senders ranked by volume, colour-graded by how much they email you.
 
 ---
@@ -31,6 +31,7 @@ It is deliberately a **desktop** application, not a web service: your credential
 - 📮 **Gmail & Outlook** support out of the box, built for easy extension to more providers.
 - 🗂️ **Grouped by domain**, busiest senders first, with a **heat colour** (red → green) showing relative volume.
 - 🔎 **Live search** by domain and **sort** (Most emails / Name A–Z / Name Z–A).
+- 🎚️ **Adjustable scan depth** — choose how many of your newest emails to scan from a toolbar dropdown (default 5,000); the choice is remembered and re-scans on the spot.
 - ⏱️ **Live fetching** with an `x / y` progress bar, then **auto-refresh every 5 seconds** (only new messages are fetched).
 - 🔕 **Unsubscribe** per sender — uses the email's official **RFC 8058 one-click** link silently when available, otherwise opens the unsubscribe page or a pre-filled email.
 - 🗑️ **Delete** all mail from a sender, or individual messages — moved to **Trash / Deleted Items** (recoverable).
@@ -218,11 +219,11 @@ flowchart TD
 | Package | Responsibility |
 |---|---|
 | `com.unsubscribeos` | `Main` (jar entry point) and `Launcher` (JavaFX `Application`; wires the service graph). |
-| `config` | `ProviderConfigs` (OAuth endpoints/scopes + help text), `AppPaths` (per-user data dir), `Settings` (theme prefs). |
+| `config` | `ProviderConfigs` (OAuth endpoints/scopes + help text), `AppPaths` (per-user data dir), `Settings` (theme + scan-depth prefs). |
 | `core.model` | Immutable **records**: `Provider`, `Account`, `Credentials`, `TokenSet`, `OAuthConfig`, `EmailMessage`, `MailDomain`, `UnsubscribeInfo`, `FetchProgress`. |
 | `core.auth` | `AuthService` (sign-in/refresh/sign-out), `AccountStore` interface + `EncryptedAccountStore`, `Aes`, `Pkce`, `LoopbackOAuth`. |
 | `core.http` | Thin `HttpClient` wrapper (`Http`, `Json`, `HttpException`). |
-| `core.mail` | `MailService` interface, `AbstractMailService` (Template Method base), `MailServiceFactory`, `gmail/`, `outlook/`, plus helpers: `ConcurrentFetcher`, `DomainAggregator`, `UnsubscribeHeaders`, `Addresses`, `Chunks`, `FetchContext`. |
+| `core.mail` | `MailService` interface, `AbstractMailService` (Template Method base), `MailServiceFactory`, `gmail/`, `outlook/`, plus helpers: `ConcurrentFetcher`, `DomainAggregator`, `UnsubscribeHeaders`, `BulkMail`, `Addresses`, `Chunks`, `FetchContext`. |
 | `core.unsubscribe` | `UnsubscribeService` (ordered Strategy: one-click → page → mailto) + `UnsubscribeResult`. |
 | `core.platform` | `Browser` (cross-platform URL/mailto launcher, incl. WSL). |
 | `ui` | `Router`, `AppContext` (DI record), `ThemeManager`, `Theme`, `Async` (off-UI-thread helper), `Errors` (throwable → message). |
@@ -296,20 +297,20 @@ sequenceDiagram
     participant M as MailService (Gmail/Outlook)
     participant F as ConcurrentFetcher
     participant G as DomainAggregator
-    D->>M: fetch(token, ctx) on a virtual thread
-    M->>M: list bulk-mail IDs (paged)
+    D->>M: fetch(token, depth, ctx) on a virtual thread
+    M->>M: list received-mail IDs newest-first (paged, up to depth)
     M->>F: fetch each message concurrently (≤12 in flight)
-    F-->>D: onMessage(EmailMessage) — into an id-keyed buffer
+    F-->>D: onMessage(EmailMessage) — keep only automated/bulk mail (personal dropped)
     F-->>D: onProgress(x / y) — live progress bar
     loop every 250ms while fetching
-        D->>G: group buffer by domain
+        D->>G: group kept messages by domain
         G-->>D: domains (busiest first)
         D->>D: apply search + sort + heat colour → render cards
     end
-    Note over D,M: After the first load, poll every 5s;<br/>ctx.shouldFetch skips already-seen IDs (cheap)
+    Note over D,M: After the first load, poll every 5s (shallow);<br/>ctx.shouldFetch skips already-seen IDs (cheap)
 ```
 
-**Mail scope.** Only bulk/marketing mail is listed — Gmail via `q = category:promotions OR category:updates OR unsubscribe`, Outlook via Graph `$search="unsubscribe"`. This keeps personal mail private and out of bulk actions. (Up to 1500 messages are scanned.)
+**Mail scope.** The scan reads your received mail newest-first — Gmail via `q = -in:sent -in:chats`, Outlook via Graph `$orderby=receivedDateTime desc` — and **keeps only automated / bulk senders**: those whose messages carry a standard list or automation header (`List-Unsubscribe`, `List-Id`, `List-Post`, `Precedence: bulk/list`, `Auto-Submitted`). Personal mail — what you wrote, and the replies people send back — has none of these, so it never appears or becomes deletable; this also catches bulk senders regardless of language or which inbox tab they land in. Senders exposing `List-Unsubscribe` get an **unsubscribe** button; the rest are **delete-only**. How many of the newest messages are scanned is **configurable** (toolbar dropdown, default 5,000, persisted as `scan.depth`); to stay responsive the 5-second poll only re-lists the newest few hundred to pick up new arrivals.
 
 #### 4. Unsubscribe
 
@@ -346,7 +347,7 @@ Per-user config directory (`$XDG_CONFIG_HOME/unsubscribeos` or `~/.config/unsubs
 | `master.key` | Per-install AES key (base64). |
 | `tokens-<provider>.enc` | Encrypted session account (tokens + client creds). Removed on sign-out. |
 | `creds-<provider>.enc` | Encrypted remembered credentials (only if "Remember me"). |
-| `settings.properties` | Non-secret prefs (theme). |
+| `settings.properties` | Non-secret prefs (theme, `scan.depth`). |
 
 ---
 
@@ -406,7 +407,7 @@ UI screens are thin and delegate to tested core/services; OAuth and live API cal
 - Delta/incremental sync (Gmail History API, Graph delta) instead of re-listing on each poll.
 - `jpackage` installers (`.msi` / `.dmg` / `.deb`) with a bundled runtime and the app icon.
 - More providers (Yahoo, IMAP).
-- Optional "show all mail" power-user mode.
+- Detect unsubscribe links in the message **body** for senders that don't send a `List-Unsubscribe` header.
 
 ---
 

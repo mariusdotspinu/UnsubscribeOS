@@ -1,5 +1,6 @@
 package com.unsubscribeos.ui.view.dashboard;
 
+import com.unsubscribeos.config.Settings;
 import com.unsubscribeos.core.mail.DomainAggregator;
 import com.unsubscribeos.core.mail.FetchContext;
 import com.unsubscribeos.core.mail.MailService;
@@ -20,24 +21,34 @@ import com.unsubscribeos.ui.component.Ui;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.event.EventTarget;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import javafx.util.StringConverter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -51,6 +62,11 @@ public final class DashboardView {
 
     private static final Duration RENDER_INTERVAL = Duration.millis(250);
     private static final Duration POLL_INTERVAL = Duration.seconds(5);
+
+    // The initial fetch scans deep (configurable) to find as many senders as possible; the live
+    // poll only needs to notice newly-arrived mail, so it re-lists just the newest few hundred —
+    // keeping each tick cheap no matter how deep the initial scan is set.
+    private static final int POLL_DEPTH = 500;
 
     private static final String ABOUT = """
             UnsubscribeOS groups bulk senders by domain so you can unsubscribe from — or delete — \
@@ -73,6 +89,10 @@ public final class DashboardView {
 
     private final AtomicBoolean cancelled = new AtomicBoolean();
     private final AtomicBoolean fetching = new AtomicBoolean();
+    private final AtomicBoolean pendingRescan = new AtomicBoolean();
+    // Every id we've already fetched (so polls skip re-fetching them), vs. only the messages that
+    // actually offer an unsubscribe, which are the ones we group and show.
+    private final Set<String> seen = ConcurrentHashMap.newKeySet();
     private final Map<String, EmailMessage> collected = new ConcurrentHashMap<>();
 
     private final Timeline renderer = new Timeline(new KeyFrame(RENDER_INTERVAL, e -> render()));
@@ -80,11 +100,18 @@ public final class DashboardView {
 
     private final TextField search = new TextField();
     private final ComboBox<DomainSort> sort = new ComboBox<>();
+    private final ComboBox<Integer> depth = new ComboBox<>();
     private final ProgressBar progressBar = new ProgressBar(0);
     private final Label progressLabel = Ui.label("Connecting to your mailbox…", "muted");
     private final VBox progressBox = new VBox(8, progressLabel, progressBar);
     private final Toast toast = new Toast();
+    private final ScrollPane scroll = new ScrollPane();
     private StackPane host;
+
+    // The scroll position the user actually chose, and whether a change to it right now is coming
+    // from a real user gesture (so we keep it) rather than a content rebuild (so we undo it).
+    private double desiredScroll;
+    private boolean userScrolling;
 
     public DashboardView(AppContext context, Router router, Account account) {
         this.context = context;
@@ -94,6 +121,46 @@ public final class DashboardView {
         this.grid = new DomainGrid(context, account, mail, toast, this::purge);
     }
 
+    /**
+     * Keeps the scrollbar wherever the user left it, no matter what changes the content. Live polls,
+     * expanding a card, deleting, and "show more" all rebuild nodes — and that (plus focus moving to
+     * a removed button) otherwise snaps the viewport to the top. Rather than wrap each mutation, we
+     * watch {@code vvalue} globally: the user's own scrolling (mouse wheel, scrollbar drag/click) is
+     * the source of truth and is remembered; any other change to the position is undone immediately,
+     * synchronously, so there's no timing window for a jump to slip through.
+     */
+    private void installScrollKeeper() {
+        scroll.addEventFilter(ScrollEvent.SCROLL, e -> markUserScroll());
+        scroll.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> { if (onScrollBar(e.getTarget())) markUserScroll(); });
+        scroll.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> { if (onScrollBar(e.getTarget())) markUserScroll(); });
+        scroll.addEventFilter(KeyEvent.KEY_PRESSED, e -> { if (isScrollKey(e.getCode())) markUserScroll(); });
+        scroll.vvalueProperty().addListener((obs, was, now) -> {
+            if (userScrolling) desiredScroll = now.doubleValue();
+            else if (now.doubleValue() != desiredScroll) scroll.setVvalue(desiredScroll);
+        });
+    }
+
+    private static boolean isScrollKey(KeyCode code) {
+        return switch (code) {
+            case UP, DOWN, PAGE_UP, PAGE_DOWN, HOME, END -> true;
+            default -> false;
+        };
+    }
+
+    /** Marks the current pulse as user-driven so the scroll it produces is kept, not reverted. */
+    private void markUserScroll() {
+        userScrolling = true;
+        Platform.runLater(() -> userScrolling = false);
+    }
+
+    private static boolean onScrollBar(EventTarget target) {
+        Node node = target instanceof Node n ? n : null;
+        for (; node != null; node = node.getParent()) {
+            if (node instanceof ScrollBar) return true;
+        }
+        return false;
+    }
+
     public Parent build() {
         progressBar.setMaxWidth(Double.MAX_VALUE);
         progressBox.getStyleClass().add("card");
@@ -101,8 +168,9 @@ public final class DashboardView {
 
         VBox content = new VBox(16, progressBox, grid.node());
         content.setPadding(new Insets(20));
-        ScrollPane scroll = new ScrollPane(content);
+        scroll.setContent(content);
         scroll.setFitToWidth(true);
+        installScrollKeeper();
 
         BorderPane frame = new BorderPane(scroll);
         frame.getStyleClass().add("root");
@@ -127,9 +195,32 @@ public final class DashboardView {
         sort.setValue(DomainSort.MOST_EMAILS);
         sort.valueProperty().addListener((obs, was, now) -> render());
 
-        HBox bar = Ui.row(12, Pos.CENTER_LEFT, search, sort);
+        HBox bar = Ui.row(12, Pos.CENTER_LEFT, search, sort, depthSelector());
         bar.setPadding(new Insets(0, 20, 12, 20));
         return bar;
+    }
+
+    /**
+     * "How deep to scan" selector. Listing the current saved depth (even if it isn't a preset, e.g.
+     * hand-edited in settings.properties) keeps it as the selected value. Changing it persists the
+     * choice and re-scans; the listener is wired only after the initial value is set, so simply
+     * opening the dashboard never triggers a spurious re-scan.
+     */
+    private ComboBox<Integer> depthSelector() {
+        int current = context.settings().scanDepth();
+        List<Integer> options = new ArrayList<>(List.of(1000, 5000, 15000, 50000));
+        if (!options.contains(current)) options.add(current);
+        options.sort(Integer::compareTo);
+
+        depth.getItems().setAll(options);
+        depth.setValue(current);
+        depth.setConverter(new StringConverter<>() {
+            @Override public String toString(Integer n) { return n == null ? "" : String.format("Scan %,d", n); }
+            @Override public Integer fromString(String s) { return depth.getValue(); }
+        });
+        depth.setTooltip(new Tooltip("How many of your newest emails to scan. Higher finds more senders but takes longer."));
+        depth.valueProperty().addListener((obs, was, now) -> changeDepth(now));
+        return depth;
     }
 
     // ---- fetch + 5s poll ----------------------------------------------------
@@ -140,12 +231,14 @@ public final class DashboardView {
 
     private void startFetch(boolean initial) {
         if (cancelled.get() || !fetching.compareAndSet(false, true)) return;
+        if (initial) showProgress();
         renderer.play();
+        int scanDepth = initial ? context.settings().scanDepth() : POLL_DEPTH;
         Thread.ofVirtual().start(() -> {
             try {
                 String token = context.authService().accessToken(account);
-                mail.fetch(token, new FetchContext(this::onMessage, this::onProgress,
-                        cancelled::get, id -> !collected.containsKey(id)));
+                mail.fetch(token, scanDepth, new FetchContext(this::onMessage, this::onProgress,
+                        cancelled::get, id -> !seen.contains(id)));
                 Platform.runLater(() -> onFetchDone(initial));
             } catch (Exception e) {
                 Platform.runLater(() -> onFetchFailed(e, initial));
@@ -155,8 +248,36 @@ public final class DashboardView {
         });
     }
 
+    /** Persists a new scan depth and re-scans with it, deeper than the live poll would reach. */
+    private void changeDepth(Integer value) {
+        if (value == null) return;
+        context.settings().put(Settings.SCAN_DEPTH, String.valueOf(value));
+        pendingRescan.set(true);
+        drainRescan();
+    }
+
+    /**
+     * Starts a queued deep re-scan once no fetch is in flight. Called both right when the depth
+     * changes and again when any fetch completes, so a re-scan requested mid-poll still runs.
+     */
+    private void drainRescan() {
+        if (cancelled.get() || fetching.get()) return;
+        if (pendingRescan.compareAndSet(true, false)) startFetch(true);
+    }
+
+    private void showProgress() {
+        progressBar.setProgress(0);
+        progressLabel.setText("Scanning your mailbox…");
+        progressBox.setVisible(true);
+        progressBox.setManaged(true);
+    }
+
     private void onMessage(EmailMessage message) {
-        collected.put(message.id(), message);
+        seen.add(message.id());
+        // Scan the whole mailbox, but keep only automated / bulk senders (newsletters, notifications,
+        // receipts, …). Personal mail — what you sent, and replies people sent back — carries none of
+        // the bulk markers, so it's dropped here and never shown or deletable.
+        if (message.bulk()) collected.put(message.id(), message);
     }
 
     private void onProgress(FetchProgress progress) {
@@ -174,12 +295,14 @@ public final class DashboardView {
             progressBox.setManaged(false);
             poller.play();
         }
+        drainRescan();
     }
 
     private void onFetchFailed(Throwable error, boolean initial) {
         renderer.stop();
         if (initial) progressLabel.setText("Couldn't fetch mail: " + Errors.describe(error));
         else toast.error("Couldn't refresh: " + Errors.describe(error));
+        drainRescan();
     }
 
     // ---- rendering: group, search, sort, colour ----------------------------
@@ -202,7 +325,7 @@ public final class DashboardView {
 
     private String emptyMessage(boolean noMail) {
         if (!noMail) return "No domains match your search.";
-        return fetching.get() ? "Scanning your mailbox…" : "No emails found.";
+        return fetching.get() ? "Scanning your mailbox…" : "No bulk senders found.";
     }
 
     private void purge(List<String> ids) {
