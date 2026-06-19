@@ -175,9 +175,9 @@ Sign-in uses the **OAuth 2.0 Authorization Code flow with PKCE** and a temporary
 
 The codebase is split into a UI-agnostic **core** and a thin **JavaFX UI**. The UI depends on the core through small interfaces and services; the core never depends on JavaFX.
 
-[![Architecture diagram](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/architecture.puml)](docs/architecture.puml)
+[![Architecture diagram](docs/architecture.png)](docs/architecture.puml)
 
-<sub>Rendered from [`docs/architecture.puml`](docs/architecture.puml) via the PlantUML server.</sub>
+<sub>Auto-rendered from [`docs/architecture.puml`](docs/architecture.puml) by the [Render diagrams](.github/workflows/render-diagrams.yml) workflow — edit the `.puml`, push, and the image updates itself.</sub>
 
 ### Layers & packages
 
@@ -215,15 +215,15 @@ Plus: **SOLID & small units** (adding a provider = one impl + one factory entry 
 
 #### 1. Startup & stay-signed-in
 
-[![Startup & stay-signed-in sequence](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/flow-startup.puml)](docs/flow-startup.puml)
+[![Startup & stay-signed-in sequence](docs/flow-startup.png)](docs/flow-startup.puml)
 
 #### 2. Sign-in (OAuth + PKCE, loopback)
 
-[![Sign-in (OAuth + PKCE, loopback) sequence](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/flow-signin.puml)](docs/flow-signin.puml)
+[![Sign-in (OAuth + PKCE, loopback) sequence](docs/flow-signin.png)](docs/flow-signin.puml)
 
 #### 3. Fetch, group & live-poll
 
-[![Fetch, group & live-poll sequence](https://www.plantuml.com/plantuml/proxy?fmt=svg&src=https://raw.githubusercontent.com/mariusdotspinu/UnsubscribeOS/master/docs/flow-fetch.puml)](docs/flow-fetch.puml)
+[![Fetch, group & live-poll sequence](docs/flow-fetch.png)](docs/flow-fetch.puml)
 
 **Mail scope.** The scan reads your received mail newest-first — Gmail via `q = -in:sent -in:chats`, Outlook via Graph `$orderby=receivedDateTime desc` — and **keeps only automated / bulk senders**: those whose messages carry a standard list or automation header (`List-Unsubscribe`, `List-Id`, `List-Post`, `Precedence: bulk/list`, `Auto-Submitted`). Personal mail — what you wrote, and the replies people send back — has none of these, so it never appears or becomes deletable; this also catches bulk senders regardless of language or which inbox tab they land in. Senders exposing `List-Unsubscribe` get an **unsubscribe** button; the rest are **delete-only**. How many of the newest messages are scanned is **configurable** (toolbar dropdown, default 5,000, persisted as `scan.depth`); to stay responsive the 5-second poll only re-lists the newest few hundred to pick up new arrivals.
 
