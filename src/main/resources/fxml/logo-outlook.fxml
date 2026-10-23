@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.Group?>
+<?import javafx.scene.shape.Line?>
+<?import javafx.scene.shape.Rectangle?>
+
+<!-- Outlook badge on a 48×48 grid: a brand-blue tile with a white envelope "M". -->
+<Group xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
+    <Rectangle width="48" height="48" arcWidth="14" arcHeight="14" fill="#0F6CBD"/>
+    <Line startX="11" startY="35" endX="11" endY="14" stroke="WHITE" strokeWidth="5" strokeLineCap="ROUND"/>
+    <Line startX="11" startY="14" endX="24" endY="27" stroke="WHITE" strokeWidth="5" strokeLineCap="ROUND"/>
+    <Line startX="24" startY="27" endX="37" endY="14" stroke="WHITE" strokeWidth="5" strokeLineCap="ROUND"/>
+    <Line startX="37" startY="14" endX="37" endY="35" stroke="WHITE" strokeWidth="5" strokeLineCap="ROUND"/>
+</Group>

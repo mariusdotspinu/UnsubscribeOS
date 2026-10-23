@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- The StackPane root is the host the About modal is layered onto. -->
+<StackPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+           fx:controller="com.unsubscribeos.ui.view.dashboard.DashboardView"
+           fx:id="host">
+    <BorderPane styleClass="root">
+        <top>
+            <VBox>
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <padding><Insets top="14" right="20" bottom="14" left="20"/></padding>
+                    <HBox spacing="8" alignment="CENTER_LEFT">
+                        <StackPane fx:id="providerLogo"/>
+                        <Label fx:id="providerName" styleClass="muted"/>
+                    </HBox>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="ⓘ" styleClass="icon, ghost" onAction="#showAbout">
+                        <tooltip><Tooltip text="About UnsubscribeOS"/></tooltip>
+                    </Button>
+                    <fx:include source="theme-toggle.fxml"/>
+                    <Button text="Sign out" styleClass="ghost" onAction="#signOut"/>
+                </HBox>
+
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <padding><Insets top="0" right="20" bottom="12" left="20"/></padding>
+                    <TextField fx:id="search" promptText="Search by domain…" HBox.hgrow="ALWAYS"/>
+                    <ComboBox fx:id="sort"/>
+                    <ComboBox fx:id="depth">
+                        <tooltip>
+                            <Tooltip text="How many of your newest emails to scan. Higher finds more senders but takes longer."/>
+                        </tooltip>
+                    </ComboBox>
+                </HBox>
+            </VBox>
+        </top>
+
+        <center>
+            <ScrollPane fx:id="scroll" fitToWidth="true">
+                <VBox spacing="16">
+                    <padding><Insets topRightBottomLeft="20"/></padding>
+                    <VBox fx:id="progressBox" styleClass="card" spacing="8">
+                        <padding><Insets topRightBottomLeft="16"/></padding>
+                        <Label fx:id="progressLabel" text="Connecting to your mailbox…" styleClass="muted"/>
+                        <ProgressBar fx:id="progressBar" progress="0" maxWidth="Infinity"/>
+                    </VBox>
+                    <fx:include source="domain-grid.fxml"/>
+                </VBox>
+            </ScrollPane>
+        </center>
+
+        <bottom>
+            <HBox alignment="CENTER" pickOnBounds="false">
+                <padding><Insets top="0" right="20" bottom="16" left="20"/></padding>
+                <fx:include source="toast.fxml"/>
+            </HBox>
+        </bottom>
+    </BorderPane>
+</StackPane>

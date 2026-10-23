@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Tooltip?>
+
+<Button xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+        fx:controller="com.unsubscribeos.ui.component.ThemeToggle"
+        fx:id="button" styleClass="icon, ghost" onAction="#toggle">
+    <tooltip>
+        <Tooltip fx:id="tooltip"/>
+    </tooltip>
+</Button>

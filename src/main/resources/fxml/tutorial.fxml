@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Selectable instructional text; links to any URLs in it are appended below by the controller. -->
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.unsubscribeos.ui.component.Tutorial"
+      fx:id="box" spacing="10">
+    <TextArea fx:id="body" styleClass="tutorial" editable="false" wrapText="true" focusTraversable="false"/>
+</VBox>

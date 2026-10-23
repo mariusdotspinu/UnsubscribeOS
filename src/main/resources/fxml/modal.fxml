@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+           fx:controller="com.unsubscribeos.ui.component.Modal"
+           fx:id="overlay" styleClass="modal-backdrop" focusTraversable="true"
+           onMouseClicked="#backdropClicked" onKeyPressed="#keyPressed">
+    <VBox styleClass="modal-card" spacing="16" maxWidth="480" maxHeight="-Infinity"
+          StackPane.alignment="CENTER">
+        <Label fx:id="title" styleClass="modal-title"/>
+        <fx:include fx:id="body" source="tutorial.fxml"/>
+        <HBox alignment="CENTER_RIGHT">
+            <Button text="Got it" styleClass="primary" onAction="#dismiss"/>
+        </HBox>
+    </VBox>
+</StackPane>

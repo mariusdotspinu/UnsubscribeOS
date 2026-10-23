@@ -7,15 +7,13 @@ import com.unsubscribeos.core.model.MailDomain;
 import com.unsubscribeos.ui.AppContext;
 import com.unsubscribeos.ui.Async;
 import com.unsubscribeos.ui.Errors;
+import com.unsubscribeos.ui.Fxml;
 import com.unsubscribeos.ui.component.HeatScale;
 import com.unsubscribeos.ui.component.Notifier;
-import com.unsubscribeos.ui.component.Ui;
-import javafx.geometry.Pos;
+import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
@@ -24,7 +22,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * One expandable sender-domain card. Built once, then {@link #update} refreshes it in place as
+ * Controller for {@code domain-card.fxml}: one expandable sender-domain card. Built once, then {@link #update} refreshes it in place as
  * the live fetch streams in — keeping its count, heat colour and ordering current without losing
  * the user's expand / "show more" state. Exposes unsubscribe / delete actions for the whole
  * sender and per-email deletion; deletions are purged from the shared buffer so re-grouping stays
@@ -47,12 +45,13 @@ final class DomainCard {
     private boolean expanded;
     private int shown;
 
-    private final VBox card = new VBox();
-    private final VBox emailBox = new VBox();
-    private final Region heat = new Region();
-    private final Label countBadge = Ui.label("", "count-badge");
-    private final Button moreButton = Ui.button("Show more", this::showMore, "ghost");
-    private final Button unsubscribeButton = Ui.icon("🔕", "Unsubscribe from this sender", this::unsubscribe, "warning");
+    @FXML private VBox card;
+    @FXML private VBox emailBox;
+    @FXML private Region heat;
+    @FXML private Label domainName;
+    @FXML private Label countBadge;
+    @FXML private Button moreButton;
+    @FXML private Button unsubscribeButton;
 
     DomainCard(AppContext context, Account account, MailService mail, String domain,
                Notifier notifier, Consumer<List<String>> purge, Runnable onRemoved) {
@@ -70,12 +69,12 @@ final class DomainCard {
     }
 
     void build() {
-        heat.setMaxHeight(Double.MAX_VALUE);
-        heat.getStyleClass().add("heat-bar");
-        emailBox.setVisible(false);
-        emailBox.setManaged(false);
-        card.getStyleClass().add("domain-card");
-        card.getChildren().setAll(header(), emailBox);
+        Fxml.load("domain-card.fxml", this);
+    }
+
+    @FXML
+    private void initialize() {
+        domainName.setText(domain);
     }
 
     /** Replaces this card's contents with the latest snapshot for the domain. */
@@ -101,16 +100,7 @@ final class DomainCard {
 
     // ---- header -------------------------------------------------------------
 
-    private HBox header() {
-        HBox info = Ui.row(12, Pos.CENTER_LEFT, heat, Ui.label(domain, "section"), countBadge, Ui.grow());
-        info.getStyleClass().add("domain-header");
-        info.setOnMouseClicked(e -> toggle());
-        HBox.setHgrow(info, Priority.ALWAYS);
-
-        Button delete = Ui.icon("✕", "Delete all emails from this sender", this::deleteDomain, "danger");
-        return Ui.row(6, Pos.CENTER_LEFT, info, unsubscribeButton, delete);
-    }
-
+    @FXML
     private void toggle() {
         expanded = !expanded;
         if (expanded && shown == 0) shown = INITIAL;
@@ -121,6 +111,7 @@ final class DomainCard {
 
     // ---- email rows ---------------------------------------------------------
 
+    @FXML
     private void showMore() {
         int from = Math.min(shown, messages.size());
         shown = Math.min(shown + PAGE, messages.size());
@@ -144,16 +135,12 @@ final class DomainCard {
     }
 
     private Node emailRow(EmailMessage message) {
-        VBox text = new VBox(2, Ui.label(message.subject(), "email-subject"), Ui.label(message.snippet(), "email-snippet"));
-        HBox.setHgrow(text, Priority.ALWAYS);
-        HBox row = Ui.row(10, Pos.CENTER_LEFT, text, Ui.grow());
-        row.getChildren().add(Ui.icon("✕", "Delete this email", () -> deleteEmail(message), "danger"));
-        row.getStyleClass().add("email-row");
-        return row;
+        return new EmailRow(message, () -> deleteEmail(message)).build();
     }
 
     // ---- actions ------------------------------------------------------------
 
+    @FXML
     private void unsubscribe() {
         notifier.info("Unsubscribing from " + domain + "…");
         var info = new MailDomain(domain, messages).bestUnsubscribe();
@@ -165,6 +152,7 @@ final class DomainCard {
                 error -> notifier.error("Unsubscribe failed: " + Errors.describe(error)));
     }
 
+    @FXML
     private void deleteDomain() {
         delete(messages.stream().map(EmailMessage::id).toList(), this::remove);
     }

@@ -1,23 +1,39 @@
 package com.unsubscribeos.ui.component;
 
+import com.unsubscribeos.ui.Theme;
 import com.unsubscribeos.ui.ThemeManager;
+import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 
-/** A theme switch button shared by every screen; its glyph follows the active theme. */
+/**
+ * Controller for {@code theme-toggle.fxml}, the theme switch shared by every screen; its glyph
+ * follows the active theme. Supply an instance to the view's loader so the include picks it up.
+ */
 public final class ThemeToggle {
 
-    private ThemeToggle() {}
+    private final ThemeManager themeManager;
 
-    public static Button button(ThemeManager themeManager) {
-        Button button = Ui.icon(
-                themeManager.current().toggleGlyph(),
-                themeManager.current().toggleTooltip(),
-                themeManager::toggle, "ghost");
-        themeManager.themeProperty().addListener((obs, was, now) -> {
-            button.setText(now.toggleGlyph());
-            button.setTooltip(new Tooltip(now.toggleTooltip()));
-        });
-        return button;
+    @FXML private Button button;
+    @FXML private Tooltip tooltip;
+
+    public ThemeToggle(ThemeManager themeManager) {
+        this.themeManager = themeManager;
+    }
+
+    @FXML
+    private void initialize() {
+        show(themeManager.current());
+        themeManager.themeProperty().addListener((obs, was, now) -> show(now));
+    }
+
+    @FXML
+    private void toggle() {
+        themeManager.toggle();
+    }
+
+    private void show(Theme theme) {
+        button.setText(theme.toggleGlyph());
+        tooltip.setText(theme.toggleTooltip());
     }
 }

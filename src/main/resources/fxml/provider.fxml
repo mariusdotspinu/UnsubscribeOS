@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.unsubscribeos.ui.view.ProviderView"
+            styleClass="root">
+    <padding><Insets topRightBottomLeft="20"/></padding>
+
+    <top>
+        <HBox spacing="10" alignment="CENTER_RIGHT">
+            <fx:include source="theme-toggle.fxml"/>
+        </HBox>
+    </top>
+
+    <center>
+        <VBox spacing="20" alignment="CENTER">
+            <ImageView fitWidth="72" fitHeight="72" preserveRatio="true" smooth="true">
+                <Image url="@../icon.png"/>
+            </ImageView>
+            <Label text="UnsubscribeOS" styleClass="title"/>
+            <Label text="Choose your mail provider to begin." styleClass="subtitle"/>
+            <HBox spacing="20" alignment="CENTER">
+                <VBox spacing="12" alignment="CENTER" styleClass="provider-tile" onMouseClicked="#chooseGmail">
+                    <StackPane fx:id="gmailLogo"/>
+                    <Label text="Gmail" styleClass="provider-name"/>
+                </VBox>
+                <VBox spacing="12" alignment="CENTER" styleClass="provider-tile" onMouseClicked="#chooseOutlook">
+                    <StackPane fx:id="outlookLogo"/>
+                    <Label text="Outlook" styleClass="provider-name"/>
+                </VBox>
+            </HBox>
+        </VBox>
+    </center>
+</BorderPane>

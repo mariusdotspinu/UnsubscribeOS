@@ -1,7 +1,8 @@
 package com.unsubscribeos.ui.component;
 
 import com.unsubscribeos.core.platform.Browser;
-import javafx.scene.Node;
+import com.unsubscribeos.ui.Fxml;
+import javafx.fxml.FXML;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
@@ -17,26 +18,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Renders instructional text the user can read, select and copy (a read-only {@link TextArea}),
+ * Controller for {@code tutorial.fxml}: instructional text the user can read, select and copy,
  * with any embedded URLs surfaced beneath as clickable links that open in the system browser.
+ * Hosts {@code fx:include} it and hand it its text through {@link #setText}.
  */
 public final class Tutorial {
 
     private static final Pattern URL = Pattern.compile("https?://\\S+");
 
-    private Tutorial() {}
+    @FXML private VBox box;
+    @FXML private TextArea body;
 
-    public static Node of(String text) {
-        TextArea body = new TextArea(text);
-        body.setEditable(false);
-        body.setWrapText(true);
-        body.setFocusTraversable(false);
+    public void setText(String text) {
+        body.setText(text);
         body.setPrefRowCount((int) text.lines().count() + 1);
-        body.getStyleClass().add("tutorial");
-
-        VBox box = new VBox(10, body);
+        box.getChildren().setAll(body);
         box.getChildren().addAll(links(text));
-        return box;
     }
 
     /** Unique URLs found in the text, in first-seen order. Package-private for testing. */
@@ -52,8 +49,8 @@ public final class Tutorial {
     }
 
     private static Hyperlink link(String url) {
-        Hyperlink link = new Hyperlink(url);
-        link.getStyleClass().add("tutorial-link");
+        Hyperlink link = Fxml.load("tutorial-link.fxml");
+        link.setText(url);
         link.setOnAction(e -> openOrCopy(link, url));
         return link;
     }

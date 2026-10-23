@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Hyperlink?>
+
+<!-- One link beneath a tutorial's text; the controller sets its URL and action. -->
+<Hyperlink xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+           styleClass="tutorial-link"/>

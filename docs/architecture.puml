@@ -13,7 +13,8 @@ package "ui  (JavaFX)" {
   component DomainGrid
   component DomainCard
   component "AppContext (DI record)" as AppContext
-  component "component/* — Ui, Toast, Modal,\nProviderLogo, AppIcon, ThemeToggle,\nTutorial, HeatScale" as UIComponents
+  component "component/* — Toast, Modal,\nProviderLogo, AppIcon, ThemeToggle,\nTutorial, HeatScale" as UIComponents
+  component "resources/fxml/*.fxml\n(layout; Java classes are controllers)" as Fxml
 }
 
 package "core  (no JavaFX)" {
@@ -46,6 +47,9 @@ Router --> CredentialsView
 Router --> DashboardView
 DashboardView --> DomainGrid
 DomainGrid --> DomainCard
+ProviderView ..> Fxml : layout
+CredentialsView ..> Fxml : layout
+DashboardView ..> Fxml : layout
 
 AuthService --> AccountStore
 AuthService --> LoopbackOAuth

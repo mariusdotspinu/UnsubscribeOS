@@ -11,19 +11,17 @@ import com.unsubscribeos.core.model.FetchProgress;
 import com.unsubscribeos.core.model.MailDomain;
 import com.unsubscribeos.ui.AppContext;
 import com.unsubscribeos.ui.Errors;
+import com.unsubscribeos.ui.Fxml;
 import com.unsubscribeos.ui.Router;
-import com.unsubscribeos.ui.component.AppIcon;
 import com.unsubscribeos.ui.component.Modal;
 import com.unsubscribeos.ui.component.ProviderLogo;
 import com.unsubscribeos.ui.component.ThemeToggle;
 import com.unsubscribeos.ui.component.Toast;
-import com.unsubscribeos.ui.component.Ui;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.event.EventTarget;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
+import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.ComboBox;
@@ -32,14 +30,10 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
@@ -53,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Main screen: streams the account's mail off-thread behind a live progress bar, then keeps the
+ * Controller for {@code dashboard.fxml}, the main screen: streams the account's mail off-thread behind a live progress bar, then keeps the
  * view fresh by re-polling every few seconds (fetching only messages not already seen). Senders
  * are grouped, searchable and sortable, and volume-graded by colour. Owns the fetch/poll
  * lifecycle and a shared status line; sign-out cancels everything and returns to the providers.
@@ -98,15 +92,18 @@ public final class DashboardView {
     private final Timeline renderer = new Timeline(new KeyFrame(RENDER_INTERVAL, e -> render()));
     private final Timeline poller = new Timeline(new KeyFrame(POLL_INTERVAL, e -> poll()));
 
-    private final TextField search = new TextField();
-    private final ComboBox<DomainSort> sort = new ComboBox<>();
-    private final ComboBox<Integer> depth = new ComboBox<>();
-    private final ProgressBar progressBar = new ProgressBar(0);
-    private final Label progressLabel = Ui.label("Connecting to your mailbox…", "muted");
-    private final VBox progressBox = new VBox(8, progressLabel, progressBar);
     private final Toast toast = new Toast();
-    private final ScrollPane scroll = new ScrollPane();
-    private StackPane host;
+
+    @FXML private StackPane host;
+    @FXML private StackPane providerLogo;
+    @FXML private Label providerName;
+    @FXML private TextField search;
+    @FXML private ComboBox<DomainSort> sort;
+    @FXML private ComboBox<Integer> depth;
+    @FXML private ScrollPane scroll;
+    @FXML private VBox progressBox;
+    @FXML private Label progressLabel;
+    @FXML private ProgressBar progressBar;
 
     // The scroll position the user actually chose, and whether a change to it right now is coming
     // from a real user gesture (so we keep it) rather than a content rebuild (so we undo it).
@@ -162,42 +159,31 @@ public final class DashboardView {
     }
 
     public Parent build() {
-        progressBar.setMaxWidth(Double.MAX_VALUE);
-        progressBox.getStyleClass().add("card");
-        progressBox.setPadding(new Insets(16));
+        return Fxml.load("dashboard.fxml", this, toast, grid, new ThemeToggle(context.themeManager()));
+    }
 
-        VBox content = new VBox(16, progressBox, grid.node());
-        content.setPadding(new Insets(20));
-        scroll.setContent(content);
-        scroll.setFitToWidth(true);
+    @FXML
+    private void initialize() {
+        providerLogo.getChildren().setAll(ProviderLogo.of(account.provider(), 20));
+        providerName.setText(account.provider().displayName());
         installScrollKeeper();
+        initToolBar();
 
-        BorderPane frame = new BorderPane(scroll);
-        frame.getStyleClass().add("root");
-        frame.setTop(new VBox(topBar(), toolBar()));
-        frame.setBottom(toastBar());
-
-        host = new StackPane(frame);
         renderer.setCycleCount(Timeline.INDEFINITE);
         poller.setCycleCount(Timeline.INDEFINITE);
         startFetch(true);
-        return host;
     }
 
     // ---- toolbar: search + sort --------------------------------------------
 
-    private HBox toolBar() {
-        search.setPromptText("Search by domain…");
+    private void initToolBar() {
         search.textProperty().addListener((obs, was, now) -> render());
-        HBox.setHgrow(search, Priority.ALWAYS);
 
         sort.getItems().setAll(DomainSort.values());
         sort.setValue(DomainSort.MOST_EMAILS);
         sort.valueProperty().addListener((obs, was, now) -> render());
 
-        HBox bar = Ui.row(12, Pos.CENTER_LEFT, search, sort, depthSelector());
-        bar.setPadding(new Insets(0, 20, 12, 20));
-        return bar;
+        initDepthSelector();
     }
 
     /**
@@ -206,7 +192,7 @@ public final class DashboardView {
      * choice and re-scans; the listener is wired only after the initial value is set, so simply
      * opening the dashboard never triggers a spurious re-scan.
      */
-    private ComboBox<Integer> depthSelector() {
+    private void initDepthSelector() {
         int current = context.settings().scanDepth();
         List<Integer> options = new ArrayList<>(List.of(1000, 5000, 15000, 50000));
         if (!options.contains(current)) options.add(current);
@@ -218,9 +204,7 @@ public final class DashboardView {
             @Override public String toString(Integer n) { return n == null ? "" : String.format("Scan %,d", n); }
             @Override public Integer fromString(String s) { return depth.getValue(); }
         });
-        depth.setTooltip(new Tooltip("How many of your newest emails to scan. Higher finds more senders but takes longer."));
         depth.valueProperty().addListener((obs, was, now) -> changeDepth(now));
-        return depth;
     }
 
     // ---- fetch + 5s poll ----------------------------------------------------
@@ -331,32 +315,12 @@ public final class DashboardView {
 
     // ---- chrome -------------------------------------------------------------
 
-    private HBox topBar() {
-        HBox provider = Ui.row(8, Pos.CENTER_LEFT,
-                ProviderLogo.of(account.provider(), 20),
-                Ui.label(account.provider().displayName(), "muted"));
-        HBox bar = Ui.row(12, Pos.CENTER_LEFT,
-                provider,
-                Ui.grow(),
-                Ui.icon("ⓘ", "About UnsubscribeOS", this::showAbout, "ghost"),
-                ThemeToggle.button(context.themeManager()),
-                Ui.button("Sign out", this::signOut, "ghost"));
-        bar.setPadding(new Insets(14, 20, 14, 20));
-        return bar;
-    }
-
+    @FXML
     private void showAbout() {
         Modal.show(host, "About UnsubscribeOS", ABOUT);
     }
 
-    private HBox toastBar() {
-        HBox bar = new HBox(toast.node());
-        bar.setAlignment(Pos.CENTER);
-        bar.setPadding(new Insets(0, 20, 16, 20));
-        bar.setPickOnBounds(false);
-        return bar;
-    }
-
+    @FXML
     private void signOut() {
         cancelled.set(true);
         poller.stop();

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.Double?>
+<?import javafx.scene.Group?>
+<?import javafx.scene.paint.LinearGradient?>
+<?import javafx.scene.paint.Stop?>
+<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.shape.Polyline?>
+<?import javafx.scene.shape.Rectangle?>
+
+<!--
+  Vector fallback for the brand mark on a 256×256 grid: a calm-blue tile with a white envelope
+  (mail) and a minus badge (unsubscribe / remove). Used only when /icon.png is missing.
+-->
+<Group xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
+    <fx:define>
+        <LinearGradient fx:id="blue" startX="0" startY="0" endX="0" endY="1" proportional="true" cycleMethod="NO_CYCLE">
+            <stops>
+                <Stop offset="0" color="#5b9bff"/>
+                <Stop offset="1" color="#3f6fe0"/>
+            </stops>
+        </LinearGradient>
+    </fx:define>
+    <Rectangle width="256" height="256" arcWidth="112" arcHeight="112" fill="$blue"/>
+    <Rectangle x="52" y="74" width="152" height="108" arcWidth="32" arcHeight="32" fill="WHITE"/>
+    <Polyline stroke="#cdddff" strokeWidth="12" strokeLineCap="ROUND" strokeLineJoin="ROUND">
+        <fill><null/></fill>
+        <points>
+            <Double fx:value="60"/><Double fx:value="86"/>
+            <Double fx:value="128"/><Double fx:value="138"/>
+            <Double fx:value="196"/><Double fx:value="86"/>
+        </points>
+    </Polyline>
+    <Circle centerX="192" centerY="180" radius="40" fill="$blue" stroke="WHITE" strokeWidth="10"/>
+    <Rectangle x="174" y="173.5" width="36" height="13" arcWidth="13" arcHeight="13" fill="WHITE"/>
+</Group>
