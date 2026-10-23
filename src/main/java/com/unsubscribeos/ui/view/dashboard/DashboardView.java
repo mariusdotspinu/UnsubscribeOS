@@ -69,13 +69,13 @@ public final class DashboardView {
     private static final int POLL_DEPTH = 500;
 
     private static final String ABOUT = """
-            UnsubscribeOS groups bulk senders by domain so you can unsubscribe from — or delete — \
-            them in one calm place.
+            UnsubscribeOS groups the mail you've received by sender domain so you can unsubscribe \
+            from — or delete — senders in one calm place.
 
             • Talks to Gmail and Outlook directly from your computer; your credentials and email never \
             leave this machine.
-            • Only marketing / list mail is shown, so personal /primary email stays private and safe from \
-            accidental deletion.
+            • Shows every sender who mails you, busiest first. Senders that offer an unsubscribe get an \
+            unsubscribe button; any sender can be deleted.
             • Deletes move messages to Trash (recoverable); unsubscribe uses the sender's official \
             one-click link when one is offered.
 
@@ -90,8 +90,8 @@ public final class DashboardView {
     private final AtomicBoolean cancelled = new AtomicBoolean();
     private final AtomicBoolean fetching = new AtomicBoolean();
     private final AtomicBoolean pendingRescan = new AtomicBoolean();
-    // Every id we've already fetched (so polls skip re-fetching them), vs. only the messages that
-    // actually offer an unsubscribe, which are the ones we group and show.
+    // Every id we've already fetched, so polls never fetch one twice; deleting purges the message
+    // from `collected` but deliberately leaves its id here, so a straggling poll can't resurrect it.
     private final Set<String> seen = ConcurrentHashMap.newKeySet();
     private final Map<String, EmailMessage> collected = new ConcurrentHashMap<>();
 
@@ -274,10 +274,7 @@ public final class DashboardView {
 
     private void onMessage(EmailMessage message) {
         seen.add(message.id());
-        // Scan the whole mailbox, but keep only automated / bulk senders (newsletters, notifications,
-        // receipts, …). Personal mail — what you sent, and replies people sent back — carries none of
-        // the bulk markers, so it's dropped here and never shown or deletable.
-        if (message.bulk()) collected.put(message.id(), message);
+        collected.put(message.id(), message);
     }
 
     private void onProgress(FetchProgress progress) {
@@ -325,7 +322,7 @@ public final class DashboardView {
 
     private String emptyMessage(boolean noMail) {
         if (!noMail) return "No domains match your search.";
-        return fetching.get() ? "Scanning your mailbox…" : "No bulk senders found.";
+        return fetching.get() ? "Scanning your mailbox…" : "No emails found.";
     }
 
     private void purge(List<String> ids) {

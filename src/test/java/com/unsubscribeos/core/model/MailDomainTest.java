@@ -13,7 +13,7 @@ class MailDomainTest {
 
     private static EmailMessage withUnsubscribe(String id, UnsubscribeInfo info) {
         return new EmailMessage(id, "S", "s@x.com", "x.com", "subj", "snip",
-                Instant.ofEpochSecond(1), Optional.ofNullable(info), info != null);
+                Instant.ofEpochSecond(1), Optional.ofNullable(info));
     }
 
     @Test

@@ -2,10 +2,10 @@ package com.unsubscribeos.core.mail.outlook;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.unsubscribeos.core.http.Http;
+import com.unsubscribeos.core.http.HttpException;
 import com.unsubscribeos.core.http.Json;
 import com.unsubscribeos.core.mail.AbstractMailService;
 import com.unsubscribeos.core.mail.Addresses;
-import com.unsubscribeos.core.mail.BulkMail;
 import com.unsubscribeos.core.mail.FetchContext;
 import com.unsubscribeos.core.mail.UnsubscribeHeaders;
 import com.unsubscribeos.core.model.EmailMessage;
@@ -13,16 +13,16 @@ import com.unsubscribeos.core.model.Provider;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Microsoft Graph provider. Mirrors Gmail: a cheap paged sweep collects the ids of bulk mail
- * (Graph {@code $search="unsubscribe"}), then each message is fetched concurrently; deletion uses
- * Graph {@code $batch} to move messages to Deleted Items (recoverable). The fetch/delete skeleton
- * lives in {@link AbstractMailService}.
+ * Microsoft Graph provider. Mirrors Gmail: a cheap paged sweep collects the ids of received mail,
+ * then each message is fetched concurrently; deletion uses Graph {@code $batch} to move messages to
+ * Deleted Items (recoverable). The fetch/delete skeleton lives in {@link AbstractMailService}.
  */
 public final class OutlookService extends AbstractMailService {
 
@@ -30,8 +30,11 @@ public final class OutlookService extends AbstractMailService {
     private static final String MESSAGES = ROOT + "/me/messages";
     private static final int PAGE_SIZE = 100;
     private static final int BATCH_LIMIT = 20;
-    // List all mail newest-first; the dashboard keeps only senders that expose a List-Unsubscribe
-    // header. ($orderby can't be combined with $search, so we drop the keyword filter entirely.)
+    // Received mail only, mirroring Gmail's "-in:sent -in:chats". Graph's /me/messages spans the
+    // *whole* mailbox — Sent Items, Drafts, Junk and Deleted Items included — which would group our
+    // own outgoing mail under our own domain and offer to "delete" mail already in the bin. Listing
+    // these two folders instead keeps the scan to mail other people sent us, archived mail included.
+    private static final List<String> FOLDERS = List.of("inbox", "archive");
     private static final String ORDER_BY = "receivedDateTime desc";
     private static final String SELECT = "id,subject,bodyPreview,from,receivedDateTime,internetMessageHeaders";
 
@@ -52,15 +55,42 @@ public final class OutlookService extends AbstractMailService {
 
     @Override
     protected List<String> listMessageIds(String accessToken, int maxMessages, FetchContext ctx) {
-        List<String> ids = new ArrayList<>();
-        String url = MESSAGES + "?$orderby=" + Http.enc(ORDER_BY) + "&$select=id&$top=" + PAGE_SIZE;
-        while (url != null && ids.size() < maxMessages && !ctx.isCancelled()) {
-            JsonNode page = Json.parse(Http.get(url, accessToken));
-            page.path("value").forEach(m -> ids.add(m.path("id").asText()));
+        List<Listed> listed = new ArrayList<>();
+        for (String folder : FOLDERS) listed.addAll(listFolder(accessToken, folder, maxMessages, ctx));
+        // Each folder arrives newest-first, but "the newest N overall" only holds once they're merged
+        // by date — otherwise a deep Inbox would use up the whole budget before Archive is considered.
+        return listed.stream()
+                .sorted(Comparator.comparing(Listed::received).reversed())
+                .limit(maxMessages)
+                .map(Listed::id)
+                .toList();
+    }
+
+    /** Ids + dates from one well-known folder, newest-first; empty if this mailbox has no such folder. */
+    private List<Listed> listFolder(String accessToken, String folder, int maxMessages, FetchContext ctx) {
+        List<Listed> listed = new ArrayList<>();
+        String url = ROOT + "/me/mailFolders/" + folder + "/messages"
+                + "?$orderby=" + Http.enc(ORDER_BY) + "&$select=id,receivedDateTime&$top=" + PAGE_SIZE;
+        while (url != null && listed.size() < maxMessages && !ctx.isCancelled()) {
+            String body;
+            try {
+                body = Http.get(url, accessToken);
+            } catch (HttpException e) {
+                // Archive isn't provisioned on every mailbox — "no such folder" just means no mail
+                // there. Anything else is a real failure and must surface.
+                if (e.status() == 404) break;
+                throw e;
+            }
+            JsonNode page = Json.parse(body);
+            page.path("value").forEach(m -> listed.add(new Listed(
+                    m.path("id").asText(), parseDate(m.path("receivedDateTime").asText(null)))));
             url = page.path("@odata.nextLink").asText(null);
         }
-        return ids.size() > maxMessages ? ids.subList(0, maxMessages) : ids;
+        return listed;
     }
+
+    /** One row of a folder listing — just enough to merge folders newest-first before the cap. */
+    private record Listed(String id, Instant received) {}
 
     @Override
     protected Optional<EmailMessage> fetchMessage(String accessToken, String id) {
@@ -82,8 +112,7 @@ public final class OutlookService extends AbstractMailService {
                 node.path("subject").asText("(no subject)"),
                 node.path("bodyPreview").asText(""),
                 parseDate(node.path("receivedDateTime").asText(null)),
-                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), domain),
-                BulkMail.isBulk(headers));
+                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), domain));
     }
 
     private Map<String, String> headerMap(JsonNode headers) {

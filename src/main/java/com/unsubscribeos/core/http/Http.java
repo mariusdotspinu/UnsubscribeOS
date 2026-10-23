@@ -80,7 +80,7 @@ public final class Http {
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             int code = response.statusCode();
             if (code >= 200 && code < 300) return response.body();
-            throw new HttpException("HTTP " + code + " for " + request.uri() + ": " + response.body());
+            throw new HttpException("HTTP " + code + " for " + request.uri() + ": " + response.body(), code);
         } catch (HttpException e) {
             throw e;
         } catch (Exception e) {

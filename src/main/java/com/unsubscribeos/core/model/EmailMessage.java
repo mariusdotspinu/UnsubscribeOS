@@ -5,9 +5,8 @@ import java.util.Optional;
 
 /**
  * A single mail message, normalised across providers. {@code unsubscribe} holds the parsed
- * contents of the RFC 2369 List-Unsubscribe header, when present. {@code bulk} marks automated /
- * list mail (newsletters, notifications, receipts) as opposed to personal correspondence, so the
- * dashboard can show senders worth cleaning up while leaving personal mail out of reach.
+ * contents of the RFC 2369 List-Unsubscribe header when the sender offers one — senders that do
+ * get an unsubscribe button on the dashboard, the rest are delete-only.
  */
 public record EmailMessage(
         String id,
@@ -17,8 +16,7 @@ public record EmailMessage(
         String subject,
         String snippet,
         Instant date,
-        Optional<UnsubscribeInfo> unsubscribe,
-        boolean bulk) {
+        Optional<UnsubscribeInfo> unsubscribe) {
 
     public boolean canUnsubscribe() {
         return unsubscribe.isPresent();

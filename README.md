@@ -4,7 +4,7 @@
 
 # UnsubscribeOS
 
-**A calm, free, open-source desktop app to clean up your inbox — unsubscribe from and delete bulk senders, grouped by domain.**
+**A calm, free, open-source desktop app to clean up your inbox — see every sender who mails you, grouped by domain, then unsubscribe or delete in a couple of clicks.**
 
 Gmail &amp; Outlook (for now) · 100% local · JavaFX · JDK 25
 
@@ -14,14 +14,14 @@ Gmail &amp; Outlook (for now) · 100% local · JavaFX · JDK 25
 
 ## What is it?
 
-UnsubscribeOS connects directly to your **Gmail** or **Outlook** mailbox from your own computer, finds the bulk/marketing senders cluttering your inbox, and groups them **by domain** so you can see who emails you the most — and **unsubscribe** from or **delete** them in a couple of clicks.
+UnsubscribeOS connects directly to your **Gmail** or **Outlook** mailbox from your own computer and groups **all the mail you've received** by sender **domain**, so you can see who emails you the most — and **unsubscribe** from or **delete** them in a couple of clicks.
 
 It is deliberately a **desktop** application, not a web service: your credentials and email **never leave your machine**. There is no server, no account, no telemetry.
 
 ### Why another unsubscriber?
 
 - **Privacy-first.** Everything runs locally. The app talks only to Google/Microsoft, directly, using OAuth credentials *you* create. Tokens are stored encrypted on disk.
-- **Safe by design.** Only automated/bulk senders (newsletters, notifications, receipts) are shown — detected via standard list/automation headers — so personal mail you wrote or received stays out of reach of the bulk-delete button. Deletions go to **Trash** (recoverable), not permanent deletion.
+- **Safe by design.** Deletions go to **Trash / Deleted Items** — always recoverable, never permanent. The Gmail scope used (`gmail.modify`) cannot permanently delete mail even in principle. Your own sent mail and drafts are never scanned, so nothing you wrote can be deleted from here.
 - **Calm & focused.** A single, quiet dashboard: senders ranked by volume, colour-graded by how much they email you.
 
 ---
@@ -188,7 +188,7 @@ The codebase is split into a UI-agnostic **core** and a thin **JavaFX UI**. The 
 | `core.model` | Immutable **records**: `Provider`, `Account`, `Credentials`, `TokenSet`, `OAuthConfig`, `EmailMessage`, `MailDomain`, `UnsubscribeInfo`, `FetchProgress`. |
 | `core.auth` | `AuthService` (sign-in/refresh/sign-out), `AccountStore` interface + `EncryptedAccountStore`, `Aes`, `Pkce`, `LoopbackOAuth`. |
 | `core.http` | Thin `HttpClient` wrapper (`Http`, `Json`, `HttpException`). |
-| `core.mail` | `MailService` interface, `AbstractMailService` (Template Method base), `MailServiceFactory`, `gmail/`, `outlook/`, plus helpers: `ConcurrentFetcher`, `DomainAggregator`, `UnsubscribeHeaders`, `BulkMail`, `Addresses`, `Chunks`, `FetchContext`. |
+| `core.mail` | `MailService` interface, `AbstractMailService` (Template Method base), `MailServiceFactory`, `gmail/`, `outlook/`, plus helpers: `ConcurrentFetcher`, `DomainAggregator`, `UnsubscribeHeaders`, `Addresses`, `Chunks`, `FetchContext`. |
 | `core.unsubscribe` | `UnsubscribeService` (ordered Strategy: one-click → page → mailto) + `UnsubscribeResult`. |
 | `core.platform` | `Browser` (cross-platform URL/mailto launcher, incl. WSL). |
 | `ui` | `Router`, `AppContext` (DI record), `ThemeManager`, `Theme`, `Async` (off-UI-thread helper), `Errors` (throwable → message). |
@@ -225,7 +225,18 @@ Plus: **SOLID & small units** (adding a provider = one impl + one factory entry 
 
 [![Fetch, group & live-poll sequence](docs/flow-fetch.png)](docs/flow-fetch.puml)
 
-**Mail scope.** The scan reads your received mail newest-first — Gmail via `q = -in:sent -in:chats`, Outlook via Graph `$orderby=receivedDateTime desc` — and **keeps only automated / bulk senders**: those whose messages carry a standard list or automation header (`List-Unsubscribe`, `List-Id`, `List-Post`, `Precedence: bulk/list`, `Auto-Submitted`). Personal mail — what you wrote, and the replies people send back — has none of these, so it never appears or becomes deletable; this also catches bulk senders regardless of language or which inbox tab they land in. Senders exposing `List-Unsubscribe` get an **unsubscribe** button; the rest are **delete-only**. How many of the newest messages are scanned is **configurable** (toolbar dropdown, default 5,000, persisted as `scan.depth`); to stay responsive the 5-second poll only re-lists the newest few hundred to pick up new arrivals.
+**Mail scope.** The scan reads **all the mail you've received**, newest-first, and groups every sender by domain — newsletters and notifications alongside personal correspondence. Nothing is filtered out by content: what you see is your mailbox.
+
+"Received" means the same thing on both providers, which takes a little work because their APIs differ:
+
+| Provider | How it's listed | What that covers |
+|---|---|---|
+| **Gmail** | `q = -in:sent -in:chats` | All mail sent to you, archived included. Spam & Trash are excluded by Gmail's defaults; your own sent and chat mail is excluded explicitly. |
+| **Outlook** | `inbox` + `archive` mail folders, merged newest-first | The same set. Graph's `/me/messages` is deliberately **not** used *to list*: it spans the entire mailbox — Sent Items, Drafts, Junk and Deleted Items too. (It's still used to fetch/delete a single message by id, where folder is irrelevant.) Mailboxes with no Archive folder return `404`, treated as "no mail there". |
+
+Excluding your own sent mail isn't just tidiness: grouping is *by sender domain*, so sent mail would pile up under your own domain, and listing Deleted Items would offer to delete mail already in the bin.
+
+Senders exposing a `List-Unsubscribe` header get an **unsubscribe** button; every other sender is **delete-only**. How many of the newest messages are scanned is **configurable** (toolbar dropdown, default 5,000, persisted as `scan.depth`); to stay responsive the 5-second poll only re-lists the newest few hundred to pick up new arrivals.
 
 #### 4. Unsubscribe
 

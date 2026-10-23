@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * Template Method base for REST mail providers. Both supported providers follow the same shape —
- * list the ids of bulk mail, fetch each message concurrently, and delete in provider-sized
+ * list the ids of received mail, fetch each message concurrently, and delete in provider-sized
  * batches — so that skeleton lives here once. Subclasses fill in only the provider-specific
  * endpoints and parsing.
  */
@@ -26,7 +26,7 @@ public abstract class AbstractMailService implements MailService {
         }
     }
 
-    /** Lists the ids of the messages in scope (bulk/marketing mail), paging up to {@code maxMessages}. */
+    /** Lists the ids of the messages in scope (mail we received), paging up to {@code maxMessages}. */
     protected abstract List<String> listMessageIds(String accessToken, int maxMessages, FetchContext context);
 
     /** Fetches and parses a single message, or empty if it can't be read. */

@@ -5,7 +5,6 @@ import com.unsubscribeos.core.http.Http;
 import com.unsubscribeos.core.http.Json;
 import com.unsubscribeos.core.mail.AbstractMailService;
 import com.unsubscribeos.core.mail.Addresses;
-import com.unsubscribeos.core.mail.BulkMail;
 import com.unsubscribeos.core.mail.FetchContext;
 import com.unsubscribeos.core.mail.UnsubscribeHeaders;
 import com.unsubscribeos.core.model.EmailMessage;
@@ -19,7 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Gmail REST v1 provider. Lists recent bulk-mail ids (paged), fetches metadata for each
+ * Gmail REST v1 provider. Lists recent received-mail ids (paged), fetches metadata for each
  * concurrently, and trashes via {@code batchModify} (adding the TRASH label) — permitted under
  * the {@code gmail.modify} scope and recoverable. The fetch/delete skeleton lives in
  * {@link AbstractMailService}; this class supplies only the Gmail specifics.
@@ -27,13 +26,12 @@ import java.util.Optional;
 public final class GmailService extends AbstractMailService {
 
     private static final String BASE = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
-    // Scan all received mail (spam/trash are excluded by default; skip your own sent/chat mail).
-    // We no longer pre-filter to "promotions/unsubscribe" here — the dashboard keeps only senders
-    // that actually expose a List-Unsubscribe header, which catches bulk mail Gmail filed elsewhere.
+    // Every message anyone sent us: spam/trash are excluded by default, and we skip our own
+    // sent/chat mail, which would otherwise group under our own domain.
     private static final String QUERY = "-in:sent -in:chats";
     private static final int BATCH_LIMIT = 1000;
     private static final List<String> HEADERS = List.of("From", "Subject", "Date",
-            "List-Unsubscribe", "List-Unsubscribe-Post", "List-Id", "List-Post", "Precedence", "Auto-Submitted");
+            "List-Unsubscribe", "List-Unsubscribe-Post");
 
     @Override
     public Provider provider() {
@@ -84,8 +82,7 @@ public final class GmailService extends AbstractMailService {
                 headers.getOrDefault("subject", "(no subject)"),
                 node.path("snippet").asText(""),
                 Instant.ofEpochMilli(node.path("internalDate").asLong(0)),
-                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), sender.domain()),
-                BulkMail.isBulk(headers));
+                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), sender.domain()));
     }
 
     private Map<String, String> headerMap(JsonNode headers) {
