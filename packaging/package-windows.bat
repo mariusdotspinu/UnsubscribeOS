@@ -8,8 +8,8 @@ set APP_VERSION=1.0.0
 set MAIN_JAR=unsubscribeos-%APP_VERSION%.jar
 set MAIN_CLASS=com.unsubscribeos.Main
 
-REM 1. Build the fat jar with Windows JavaFX natives.
-call mvn -Djavafx.platform=win clean package || exit /b 1
+REM 1. Build the fat jar; pom.xml picks the Windows JavaFX natives.
+call mvn clean package || exit /b 1
 
 REM 2. Stage just the runnable jar in a clean input folder.
 if exist target\app rmdir /s /q target\app

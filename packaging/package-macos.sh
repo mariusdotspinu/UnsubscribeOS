@@ -9,8 +9,8 @@ APP_VERSION="1.0.0"
 MAIN_JAR="unsubscribeos-${APP_VERSION}.jar"
 MAIN_CLASS="com.unsubscribeos.Main"
 
-# 1. Build the fat jar with macOS JavaFX natives.
-mvn -Djavafx.platform=mac clean package
+# 1. Build the fat jar; pom.xml picks the JavaFX natives for this Mac (Apple Silicon or Intel).
+mvn clean package
 
 # 2. Stage just the runnable jar in a clean input folder.
 rm -rf target/app && mkdir -p target/app

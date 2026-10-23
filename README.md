@@ -115,7 +115,7 @@ java -jar target/unsubscribeos-1.0.0.jar
 > ```bash
 > mvn -Djavafx.platform=win clean package   # bundles Windows .dll natives
 > ```
-> Use `mac`/`linux` likewise. (Handy when developing in WSL but running on Windows.)
+> By default `pom.xml` picks the natives for the building machine (including Apple Silicon and ARM Linux). Use `mac`, `mac-aarch64`, `linux` or `linux-aarch64` likewise. (Handy when developing in WSL but running on Windows.)
 
 ### Building installers
 
@@ -191,10 +191,12 @@ The codebase is split into a UI-agnostic **core** and a thin **JavaFX UI**. The 
 | `core.mail` | `MailService` interface, `AbstractMailService` (Template Method base), `MailServiceFactory`, `gmail/`, `outlook/`, plus helpers: `ConcurrentFetcher`, `DomainAggregator`, `UnsubscribeHeaders`, `Addresses`, `Chunks`, `FetchContext`. |
 | `core.unsubscribe` | `UnsubscribeService` (ordered Strategy: one-click → page → mailto) + `UnsubscribeResult`. |
 | `core.platform` | `Browser` (cross-platform URL/mailto launcher, incl. WSL). |
-| `ui` | `Router`, `AppContext` (DI record), `ThemeManager`, `Theme`, `Async` (off-UI-thread helper), `Errors` (throwable → message). |
+| `ui` | `Router`, `AppContext` (DI record), `Fxml` (FXML loader), `ThemeManager`, `Theme`, `Async` (off-UI-thread helper), `Errors` (throwable → message). |
 | `ui.view` | Onboarding screens: `ProviderView`, `CredentialsView`. |
-| `ui.view.dashboard` | The dashboard feature: `DashboardView`, `DomainGrid`, `DomainCard`, `DomainSort`. |
-| `ui.component` | Reusable widgets: `Ui`, `Toast`/`Notifier`, `Modal`, `Tutorial`, `ProviderLogo`, `AppIcon`, `ThemeToggle`, `HeatScale`. |
+| `ui.view.dashboard` | The dashboard feature: `DashboardView`, `DomainGrid`, `DomainCard`, `EmailRow`, `DomainSort`. |
+| `ui.component` | Reusable widgets: `Toast`/`Notifier`, `Modal`, `Tutorial`, `ProviderLogo`, `AppIcon`, `ThemeToggle`, `HeatScale`. |
+
+**FXML = layout, Java = logic.** Every screen and widget is laid out in `src/main/resources/fxml/*.fxml`; the Java class named in its `fx:controller` holds only behaviour. Controllers that need runtime state (services, the account) are created by the caller and handed to `Fxml.load`; reusable pieces are pulled in with `fx:include`, and repeated items (domain cards, email rows) are loaded from their own FXML template.
 
 ### Design principles & patterns
 
@@ -304,12 +306,13 @@ src/main/java/com/unsubscribeos/
 │   ├── unsubscribe/                   # UnsubscribeService, UnsubscribeResult
 │   └── platform/                      # Browser
 └── ui/
-    ├── Router · AppContext · ThemeManager · Theme · Async · Errors
+    ├── Router · AppContext · Fxml · ThemeManager · Theme · Async · Errors
     ├── view/                          # ProviderView, CredentialsView
-    │   └── dashboard/                 # DashboardView, DomainGrid, DomainCard, DomainSort
-    └── component/                     # Ui, Toast, Modal, Tutorial, ProviderLogo, AppIcon, ThemeToggle, HeatScale
+    │   └── dashboard/                 # DashboardView, DomainGrid, DomainCard, EmailRow, DomainSort
+    └── component/                     # Toast, Modal, Tutorial, ProviderLogo, AppIcon, ThemeToggle, HeatScale
 src/main/resources/
 ├── css/                               # app.css + theme-dark.css + theme-light.css
+├── fxml/                              # layout for every screen and widget (one file per controller)
 └── icon.svg · icon.png
 src/test/java/…                        # JUnit 5 tests for the pure logic
 ```
