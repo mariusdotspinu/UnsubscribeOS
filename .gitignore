@@ -1,6 +1,7 @@
 # Build output
 target/
 dist/
+dependency-reduced-pom.xml
 
 # IDE
 .idea/
