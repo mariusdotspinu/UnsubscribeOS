@@ -2,12 +2,11 @@ package com.unsubscribeos.core.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /** Thin shared Jackson facade. Tree-model parsing keeps provider mapping explicit and dependency-free. */
 public final class Json {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private Json() {}
 
@@ -16,6 +15,14 @@ public final class Json {
             return MAPPER.readTree(body);
         } catch (Exception e) {
             throw new IllegalStateException("Invalid JSON response", e);
+        }
+    }
+
+    public static <T> T read(String body, Class<T> type) {
+        try {
+            return MAPPER.readValue(body, type);
+        } catch (Exception e) {
+            throw new IllegalStateException("Invalid JSON for " + type.getSimpleName(), e);
         }
     }
 

@@ -9,7 +9,7 @@ import com.unsubscribeos.ui.Async;
 import com.unsubscribeos.ui.Errors;
 import com.unsubscribeos.ui.Fxml;
 import com.unsubscribeos.ui.component.HeatScale;
-import com.unsubscribeos.ui.component.Notifier;
+import com.unsubscribeos.ui.component.Toast;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -36,7 +36,7 @@ final class DomainCard {
     private final AppContext context;
     private final Account account;
     private final MailService mail;
-    private final Notifier notifier;
+    private final Toast notifier;
     private final Consumer<List<String>> purge;
     private final Runnable onRemoved;
     private final String domain;
@@ -54,7 +54,7 @@ final class DomainCard {
     @FXML private Button unsubscribeButton;
 
     DomainCard(AppContext context, Account account, MailService mail, String domain,
-               Notifier notifier, Consumer<List<String>> purge, Runnable onRemoved) {
+               Toast notifier, Consumer<List<String>> purge, Runnable onRemoved) {
         this.context = context;
         this.account = account;
         this.mail = mail;
@@ -115,27 +115,24 @@ final class DomainCard {
     private void showMore() {
         int from = Math.min(shown, messages.size());
         shown = Math.min(shown + PAGE, messages.size());
-        int to = Math.min(shown, messages.size());
         // Insert the freshly revealed rows before the "Show more" button without removing it, then
         // drop the button once the last row is shown. (The scrollbar is kept steady globally by the
         // dashboard's scroll keeper.)
-        List<Node> newRows = new ArrayList<>();
-        for (int i = from; i < to; i++) newRows.add(emailRow(messages.get(i)));
         int insertAt = emailBox.getChildren().indexOf(moreButton);
-        emailBox.getChildren().addAll(insertAt < 0 ? emailBox.getChildren().size() : insertAt, newRows);
-        if (to >= messages.size()) emailBox.getChildren().remove(moreButton);
+        emailBox.getChildren().addAll(insertAt < 0 ? emailBox.getChildren().size() : insertAt, rows(from, shown));
+        if (shown >= messages.size()) emailBox.getChildren().remove(moreButton);
     }
 
     private void renderRows() {
         int visible = Math.min(shown, messages.size());
-        List<Node> rows = new ArrayList<>();
-        for (int i = 0; i < visible; i++) rows.add(emailRow(messages.get(i)));
-        if (visible < messages.size()) rows.add(moreButton);
-        emailBox.getChildren().setAll(rows);
+        emailBox.getChildren().setAll(rows(0, visible));
+        if (visible < messages.size()) emailBox.getChildren().add(moreButton);
     }
 
-    private Node emailRow(EmailMessage message) {
-        return new EmailRow(message, () -> deleteEmail(message)).build();
+    private List<Node> rows(int from, int to) {
+        return messages.subList(from, to).stream()
+                .map(message -> new EmailRow(message, () -> deleteEmail(message)).build())
+                .toList();
     }
 
     // ---- actions ------------------------------------------------------------
@@ -154,14 +151,14 @@ final class DomainCard {
 
     @FXML
     private void deleteDomain() {
-        delete(messages.stream().map(EmailMessage::id).toList(), this::remove);
+        delete(messages.stream().map(EmailMessage::id).toList(), onRemoved);
     }
 
     private void deleteEmail(EmailMessage message) {
         delete(List.of(message.id()), () -> {
             messages.remove(message);
             if (messages.isEmpty()) {
-                remove();
+                onRemoved.run();
             } else {
                 countBadge.setText(String.valueOf(messages.size()));
                 if (expanded) renderRows();
@@ -178,9 +175,5 @@ final class DomainCard {
                     notifier.success("Moved " + ids.size() + " email(s) from " + domain + " to Trash.");
                 },
                 error -> notifier.error("Delete failed: " + Errors.describe(error)));
-    }
-
-    private void remove() {
-        onRemoved.run();
     }
 }

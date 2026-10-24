@@ -29,17 +29,11 @@ public final class Http {
         return send(bearer(url, accessToken).GET().build());
     }
 
-    public static String get(String url, String accessToken, Map<String, String> headers) {
-        HttpRequest.Builder builder = bearer(url, accessToken);
-        headers.forEach(builder::header);
-        return send(builder.GET().build());
-    }
-
     public static String postForm(String url, Map<String, String> form) {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(formEncode(form)))
+                .POST(HttpRequest.BodyPublishers.ofString(query(form)))
                 .build();
         return send(request);
     }
@@ -49,10 +43,6 @@ public final class Http {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build());
-    }
-
-    public static void delete(String url, String accessToken) {
-        send(bearer(url, accessToken).DELETE().build());
     }
 
     /** Fire-and-forget HTTPS POST used for RFC 8058 one-click unsubscribe; returns status code. */
@@ -88,8 +78,9 @@ public final class Http {
         }
     }
 
-    private static String formEncode(Map<String, String> form) {
-        return form.entrySet().stream()
+    /** URL-encodes {@code params} as {@code k=v&k=v}, for a query string or a form body. */
+    public static String query(Map<String, String> params) {
+        return params.entrySet().stream()
                 .map(e -> enc(e.getKey()) + "=" + enc(e.getValue()))
                 .collect(Collectors.joining("&"));
     }

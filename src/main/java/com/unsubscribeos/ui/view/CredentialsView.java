@@ -1,19 +1,15 @@
 package com.unsubscribeos.ui.view;
 
-import com.unsubscribeos.config.ProviderConfigs;
 import com.unsubscribeos.core.model.Provider;
 import com.unsubscribeos.ui.AppContext;
 import com.unsubscribeos.ui.Async;
 import com.unsubscribeos.ui.Errors;
-import com.unsubscribeos.ui.Fxml;
 import com.unsubscribeos.ui.Router;
 import com.unsubscribeos.ui.component.ProviderLogo;
-import com.unsubscribeos.ui.component.ThemeToggle;
 import com.unsubscribeos.ui.component.Tutorial;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.fxml.FXML;
-import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
@@ -48,18 +44,14 @@ public final class CredentialsView {
         this.context = context;
         this.router = router;
         this.provider = provider;
-        this.secretRequired = ProviderConfigs.requiresSecret(provider);
-    }
-
-    public Parent build() {
-        return Fxml.load("credentials.fxml", this, new ThemeToggle(context.themeManager()));
+        this.secretRequired = provider.requiresSecret();
     }
 
     @FXML
     private void initialize() {
         logo.getChildren().setAll(ProviderLogo.of(provider, 30));
         heading.setText("Connect your " + provider.displayName());
-        helpController.setText(ProviderConfigs.helpText(provider));
+        helpController.setText(provider.helpText());
         secretField.setVisible(secretRequired);
         secretField.setManaged(secretRequired);
         signIn.setText("Connect " + provider.displayName());

@@ -2,7 +2,6 @@ package com.unsubscribeos;
 
 import com.unsubscribeos.config.Settings;
 import com.unsubscribeos.core.auth.AuthService;
-import com.unsubscribeos.core.auth.EncryptedAccountStore;
 import com.unsubscribeos.core.model.Account;
 import com.unsubscribeos.core.model.Provider;
 import com.unsubscribeos.core.unsubscribe.UnsubscribeService;
@@ -10,9 +9,9 @@ import com.unsubscribeos.ui.AppContext;
 import com.unsubscribeos.ui.Async;
 import com.unsubscribeos.ui.Router;
 import com.unsubscribeos.ui.ThemeManager;
-import com.unsubscribeos.ui.component.AppIcon;
 import javafx.application.Application;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 
@@ -36,7 +35,7 @@ public final class Launcher extends Application {
     @Override
     public void start(Stage stage) {
         Settings settings = new Settings();
-        AuthService authService = new AuthService(new EncryptedAccountStore());
+        AuthService authService = new AuthService();
         AppContext context = new AppContext(
                 authService, new UnsubscribeService(), new ThemeManager(settings), settings);
 
@@ -50,7 +49,7 @@ public final class Launcher extends Application {
                 error -> { /* no/expired session — stay on the provider screen */ });
 
         stage.setTitle("UnsubscribeOS");
-        stage.getIcons().setAll(AppIcon.icons());
+        stage.getIcons().setAll(new Image(Launcher.class.getResource("/icon.png").toExternalForm()));
         stage.setScene(scene);
         stage.setMinWidth(720);
         stage.setMinHeight(560);

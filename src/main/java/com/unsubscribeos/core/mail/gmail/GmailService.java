@@ -3,44 +3,34 @@ package com.unsubscribeos.core.mail.gmail;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.unsubscribeos.core.http.Http;
 import com.unsubscribeos.core.http.Json;
-import com.unsubscribeos.core.mail.AbstractMailService;
-import com.unsubscribeos.core.mail.Addresses;
 import com.unsubscribeos.core.mail.FetchContext;
-import com.unsubscribeos.core.mail.UnsubscribeHeaders;
+import com.unsubscribeos.core.mail.MailService;
 import com.unsubscribeos.core.model.EmailMessage;
-import com.unsubscribeos.core.model.Provider;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Gmail REST v1 provider. Lists recent received-mail ids (paged), fetches metadata for each
  * concurrently, and trashes via {@code batchModify} (adding the TRASH label) — permitted under
  * the {@code gmail.modify} scope and recoverable. The fetch/delete skeleton lives in
- * {@link AbstractMailService}; this class supplies only the Gmail specifics.
+ * {@link MailService}; this class supplies only the Gmail specifics.
  */
-public final class GmailService extends AbstractMailService {
+public final class GmailService extends MailService {
 
     private static final String BASE = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
     // Every message anyone sent us: spam/trash are excluded by default, and we skip our own
     // sent/chat mail, which would otherwise group under our own domain.
     private static final String QUERY = "-in:sent -in:chats";
-    private static final int BATCH_LIMIT = 1000;
-    private static final List<String> HEADERS = List.of("From", "Subject", "Date",
-            "List-Unsubscribe", "List-Unsubscribe-Post");
+    private static final String METADATA = "?format=metadata" + List.of("From", "Subject", "Date",
+            "List-Unsubscribe", "List-Unsubscribe-Post").stream()
+            .map(h -> "&metadataHeaders=" + Http.enc(h)).collect(Collectors.joining());
 
-    @Override
-    public Provider provider() {
-        return Provider.GMAIL;
-    }
-
-    @Override
-    protected int batchLimit() {
-        return BATCH_LIMIT;
+    public GmailService() {
+        super(1000);
     }
 
     @Override
@@ -65,29 +55,10 @@ public final class GmailService extends AbstractMailService {
     }
 
     @Override
-    protected Optional<EmailMessage> fetchMessage(String accessToken, String id) {
-        String url = BASE + "/" + id + "?format=metadata"
-                + HEADERS.stream().map(h -> "&metadataHeaders=" + Http.enc(h)).reduce("", String::concat);
-        return Optional.of(toMessage(id, Json.parse(Http.get(url, accessToken))));
-    }
-
-    private EmailMessage toMessage(String id, JsonNode node) {
-        Map<String, String> headers = headerMap(node.path("payload").path("headers"));
-        Addresses.Sender sender = Addresses.parseFrom(headers.get("from"));
-        return new EmailMessage(
-                id,
-                sender.name(),
-                sender.address(),
-                sender.domain(),
-                headers.getOrDefault("subject", "(no subject)"),
-                node.path("snippet").asText(""),
-                Instant.ofEpochMilli(node.path("internalDate").asLong(0)),
-                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), sender.domain()));
-    }
-
-    private Map<String, String> headerMap(JsonNode headers) {
-        Map<String, String> map = new HashMap<>();
-        headers.forEach(h -> map.put(h.path("name").asText().toLowerCase(), h.path("value").asText()));
-        return map;
+    protected EmailMessage fetchMessage(String accessToken, String id) {
+        JsonNode node = Json.parse(Http.get(BASE + "/" + id + METADATA, accessToken));
+        Map<String, String> headers = headers(node.path("payload").path("headers"));
+        return message(id, headers.get("from"), headers.getOrDefault("subject", "(no subject)"),
+                node.path("snippet").asText(""), Instant.ofEpochMilli(node.path("internalDate").asLong(0)), headers);
     }
 }

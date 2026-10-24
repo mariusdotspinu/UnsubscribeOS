@@ -4,32 +4,27 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.unsubscribeos.core.http.Http;
 import com.unsubscribeos.core.http.HttpException;
 import com.unsubscribeos.core.http.Json;
-import com.unsubscribeos.core.mail.AbstractMailService;
-import com.unsubscribeos.core.mail.Addresses;
 import com.unsubscribeos.core.mail.FetchContext;
-import com.unsubscribeos.core.mail.UnsubscribeHeaders;
+import com.unsubscribeos.core.mail.MailService;
 import com.unsubscribeos.core.model.EmailMessage;
-import com.unsubscribeos.core.model.Provider;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.stream.IntStream;
 
 /**
  * Microsoft Graph provider. Mirrors Gmail: a cheap paged sweep collects the ids of received mail,
  * then each message is fetched concurrently; deletion uses Graph {@code $batch} to move messages to
- * Deleted Items (recoverable). The fetch/delete skeleton lives in {@link AbstractMailService}.
+ * Deleted Items (recoverable). The fetch/delete skeleton lives in {@link MailService}.
  */
-public final class OutlookService extends AbstractMailService {
+public final class OutlookService extends MailService {
 
     private static final String ROOT = "https://graph.microsoft.com/v1.0";
     private static final String MESSAGES = ROOT + "/me/messages";
     private static final int PAGE_SIZE = 100;
-    private static final int BATCH_LIMIT = 20;
     // Received mail only, mirroring Gmail's "-in:sent -in:chats". Graph's /me/messages spans the
     // *whole* mailbox — Sent Items, Drafts, Junk and Deleted Items included — which would group our
     // own outgoing mail under our own domain and offer to "delete" mail already in the bin. Listing
@@ -38,19 +33,16 @@ public final class OutlookService extends AbstractMailService {
     private static final String ORDER_BY = "receivedDateTime desc";
     private static final String SELECT = "id,subject,bodyPreview,from,receivedDateTime,internetMessageHeaders";
 
-    @Override
-    public Provider provider() {
-        return Provider.OUTLOOK;
+    public OutlookService() {
+        super(20);
     }
 
     @Override
-    protected int batchLimit() {
-        return BATCH_LIMIT;
-    }
-
-    @Override
-    protected void deleteBatch(String accessToken, List<String> messageIds) {
-        Http.postJson(ROOT + "/$batch", accessToken, batchBody(messageIds));
+    protected void deleteBatch(String accessToken, List<String> ids) {
+        List<Map<String, String>> requests = IntStream.range(0, ids.size())
+                .mapToObj(i -> Map.of("id", String.valueOf(i), "method", "DELETE", "url", "/me/messages/" + ids.get(i)))
+                .toList();
+        Http.postJson(ROOT + "/$batch", accessToken, Json.write(Map.of("requests", requests)));
     }
 
     @Override
@@ -93,32 +85,11 @@ public final class OutlookService extends AbstractMailService {
     private record Listed(String id, Instant received) {}
 
     @Override
-    protected Optional<EmailMessage> fetchMessage(String accessToken, String id) {
-        String url = MESSAGES + "/" + id + "?$select=" + Http.enc(SELECT);
-        return Optional.of(toMessage(Json.parse(Http.get(url, accessToken))));
-    }
-
-    private EmailMessage toMessage(JsonNode node) {
-        JsonNode from = node.path("from").path("emailAddress");
-        String address = from.path("address").asText("").toLowerCase();
-        String name = from.path("name").asText(address);
-        var domain = Addresses.parseFrom(name + " <" + address + ">").domain();
-        Map<String, String> headers = headerMap(node.path("internetMessageHeaders"));
-        return new EmailMessage(
-                node.path("id").asText(),
-                name,
-                address,
-                domain,
-                node.path("subject").asText("(no subject)"),
-                node.path("bodyPreview").asText(""),
-                parseDate(node.path("receivedDateTime").asText(null)),
-                UnsubscribeHeaders.parse(headers.get("list-unsubscribe"), headers.get("list-unsubscribe-post"), domain));
-    }
-
-    private Map<String, String> headerMap(JsonNode headers) {
-        Map<String, String> map = new HashMap<>();
-        for (JsonNode h : headers) map.put(h.path("name").asText().toLowerCase(), h.path("value").asText());
-        return map;
+    protected EmailMessage fetchMessage(String accessToken, String id) {
+        JsonNode node = Json.parse(Http.get(MESSAGES + "/" + id + "?$select=" + Http.enc(SELECT), accessToken));
+        return message(node.path("id").asText(), node.path("from").path("emailAddress").path("address").asText(""),
+                node.path("subject").asText("(no subject)"), node.path("bodyPreview").asText(""),
+                parseDate(node.path("receivedDateTime").asText(null)), headers(node.path("internetMessageHeaders")));
     }
 
     private Instant parseDate(String iso) {
@@ -127,14 +98,5 @@ public final class OutlookService extends AbstractMailService {
         } catch (RuntimeException e) {
             return Instant.EPOCH;
         }
-    }
-
-    private String batchBody(List<String> ids) {
-        List<Map<String, Object>> requests = new ArrayList<>();
-        for (int i = 0; i < ids.size(); i++) {
-            requests.add(Map.of("id", String.valueOf(i), "method", "DELETE",
-                    "url", "/me/messages/" + ids.get(i)));
-        }
-        return Json.write(Map.of("requests", requests));
     }
 }

@@ -32,10 +32,6 @@ public final class ThemeManager {
         return theme;
     }
 
-    public Theme current() {
-        return theme.get();
-    }
-
     public void toggle() {
         Theme next = theme.get().other();
         theme.set(next);

@@ -18,6 +18,10 @@
 <StackPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
            fx:controller="com.unsubscribeos.ui.view.dashboard.DashboardView"
            fx:id="host">
+    <fx:define>
+        <!-- Shown in `list` instead of cards while there is nothing to list. -->
+        <Label fx:id="message" styleClass="muted"/>
+    </fx:define>
     <BorderPane styleClass="root">
         <top>
             <VBox>
@@ -57,7 +61,7 @@
                         <Label fx:id="progressLabel" text="Connecting to your mailbox…" styleClass="muted"/>
                         <ProgressBar fx:id="progressBar" progress="0" maxWidth="Infinity"/>
                     </VBox>
-                    <fx:include source="domain-grid.fxml"/>
+                    <VBox fx:id="list" spacing="12"/>
                 </VBox>
             </ScrollPane>
         </center>
@@ -65,7 +69,7 @@
         <bottom>
             <HBox alignment="CENTER" pickOnBounds="false">
                 <padding><Insets top="0" right="20" bottom="16" left="20"/></padding>
-                <fx:include source="toast.fxml"/>
+                <fx:include fx:id="toast" source="toast.fxml"/>
             </HBox>
         </bottom>
     </BorderPane>

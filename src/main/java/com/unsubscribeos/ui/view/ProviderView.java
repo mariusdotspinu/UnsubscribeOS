@@ -1,13 +1,9 @@
 package com.unsubscribeos.ui.view;
 
 import com.unsubscribeos.core.model.Provider;
-import com.unsubscribeos.ui.AppContext;
-import com.unsubscribeos.ui.Fxml;
 import com.unsubscribeos.ui.Router;
 import com.unsubscribeos.ui.component.ProviderLogo;
-import com.unsubscribeos.ui.component.ThemeToggle;
 import javafx.fxml.FXML;
-import javafx.scene.Parent;
 import javafx.scene.layout.StackPane;
 
 /**
@@ -16,19 +12,13 @@ import javafx.scene.layout.StackPane;
  */
 public final class ProviderView {
 
-    private final AppContext context;
     private final Router router;
 
     @FXML private StackPane gmailLogo;
     @FXML private StackPane outlookLogo;
 
-    public ProviderView(AppContext context, Router router) {
-        this.context = context;
+    public ProviderView(Router router) {
         this.router = router;
-    }
-
-    public Parent build() {
-        return Fxml.load("provider.fxml", this, new ThemeToggle(context.themeManager()));
     }
 
     @FXML

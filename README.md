@@ -184,17 +184,17 @@ The codebase is split into a UI-agnostic **core** and a thin **JavaFX UI**. The 
 | Package | Responsibility |
 |---|---|
 | `com.unsubscribeos` | `Main` (jar entry point) and `Launcher` (JavaFX `Application`; wires the service graph). |
-| `config` | `ProviderConfigs` (OAuth endpoints/scopes + help text), `AppPaths` (per-user data dir), `Settings` (theme + scan-depth prefs). |
-| `core.model` | Immutable **records**: `Provider`, `Account`, `Credentials`, `TokenSet`, `OAuthConfig`, `EmailMessage`, `MailDomain`, `UnsubscribeInfo`, `FetchProgress`. |
-| `core.auth` | `AuthService` (sign-in/refresh/sign-out), `AccountStore` interface + `EncryptedAccountStore`, `Aes`, `Pkce`, `LoopbackOAuth`. |
+| `config` | `AppPaths` (per-user data dir), `Settings` (theme + scan-depth prefs). |
+| `core.model` | Immutable **records**: `Account`, `Credentials`, `TokenSet`, `OAuthConfig`, `EmailMessage`, `MailDomain`, `UnsubscribeInfo`, `FetchProgress` — plus the `Provider` enum (display name, OAuth endpoints/scopes, help text). |
+| `core.auth` | `AuthService` (sign-in/refresh/sign-out), `AccountStore` (encrypted on-disk sessions + remembered credentials), `Aes`, `Pkce`, `LoopbackOAuth`. |
 | `core.http` | Thin `HttpClient` wrapper (`Http`, `Json`, `HttpException`). |
-| `core.mail` | `MailService` interface, `AbstractMailService` (Template Method base), `MailServiceFactory`, `gmail/`, `outlook/`, plus helpers: `ConcurrentFetcher`, `DomainAggregator`, `UnsubscribeHeaders`, `Addresses`, `Chunks`, `FetchContext`. |
-| `core.unsubscribe` | `UnsubscribeService` (ordered Strategy: one-click → page → mailto) + `UnsubscribeResult`. |
+| `core.mail` | `MailService` (abstract base: concurrent fetch, batched delete, `MailService.of(provider)`), `gmail/`, `outlook/`, `UnsubscribeHeaders`, `FetchContext`. |
+| `core.unsubscribe` | `UnsubscribeService` (one-click → page → mailto, first that applies) + `UnsubscribeResult`. |
 | `core.platform` | `Browser` (cross-platform URL/mailto launcher, incl. WSL). |
 | `ui` | `Router`, `AppContext` (DI record), `Fxml` (FXML loader), `ThemeManager`, `Theme`, `Async` (off-UI-thread helper), `Errors` (throwable → message). |
 | `ui.view` | Onboarding screens: `ProviderView`, `CredentialsView`. |
-| `ui.view.dashboard` | The dashboard feature: `DashboardView`, `DomainGrid`, `DomainCard`, `EmailRow`, `DomainSort`. |
-| `ui.component` | Reusable widgets: `Toast`/`Notifier`, `Modal`, `Tutorial`, `ProviderLogo`, `AppIcon`, `ThemeToggle`, `HeatScale`. |
+| `ui.view.dashboard` | The dashboard feature: `DashboardView`, `DomainCard`, `EmailRow`, `DomainSort`. |
+| `ui.component` | Reusable widgets: `Toast`, `Modal`, `Tutorial`, `ProviderLogo`, `ThemeToggle`, `HeatScale`. |
 
 **FXML = layout, Java = logic.** Every screen and widget is laid out in `src/main/resources/fxml/*.fxml`; the Java class named in its `fx:controller` holds only behaviour. Controllers that need runtime state (services, the account) are created by the caller and handed to `Fxml.load`; reusable pieces are pulled in with `fx:include`, and repeated items (domain cards, email rows) are loaded from their own FXML template.
 
@@ -202,14 +202,13 @@ The codebase is split into a UI-agnostic **core** and a thin **JavaFX UI**. The 
 
 The code leans on a handful of patterns where they remove real duplication — not for their own sake:
 
-- **Factory** — `MailServiceFactory` resolves the right `MailService` per provider.
-- **Template Method** — `AbstractMailService` holds the shared *list → fetch concurrently → delete in batches* skeleton; `GmailService`/`OutlookService` fill in only the provider specifics.
-- **Strategy** — `UnsubscribeService` tries an ordered list of methods (one-click → page → mailto); `DomainSort` swaps comparators for the sort control.
+- **Template Method** — `MailService` holds the shared *list → fetch concurrently → delete in batches* skeleton; `GmailService`/`OutlookService` fill in only the provider specifics. `MailService.of` picks the subclass with an exhaustive `switch`.
+- **Strategy** — `DomainSort` swaps comparators for the sort control.
 - **Observer** — JavaFX properties (e.g. `ThemeManager`) notify the UI of changes.
 - **Dependency Injection** — `AppContext` (a record) passes shared services to views; nothing reaches for globals.
-- **Facade** — `Http` over `HttpClient`, `Browser` over OS launchers; `Notifier` hides how feedback is shown (`Toast`).
+- **Facade** — `Http` over `HttpClient`, `Browser` over OS launchers.
 
-Plus: **SOLID & small units** (adding a provider = one impl + one factory entry + one config entry), **immutability** (domain data are records), **functional style** (streams, small composable methods), and **concurrency** (blocking I/O on **virtual threads**, results marshalled back via `Async`/`Platform.runLater`, per-message fetches bounded by a semaphore).
+Plus: **SOLID & small units** (adding a provider = one `Provider` entry + one `MailService` subclass), **immutability** (domain data are records), **functional style** (streams, small composable methods), and **concurrency** (blocking I/O on **virtual threads**, results marshalled back via `Async`/`Platform.runLater`, per-message fetches bounded by a semaphore).
 
 ---
 
@@ -283,10 +282,9 @@ Per-user config directory (`$XDG_CONFIG_HOME/unsubscribeos` or `~/.config/unsubs
 
 The provider boundary is intentionally small. To add, say, Yahoo:
 
-1. Add a value to `core.model.Provider` (display name + glyph).
-2. Extend `core.mail.AbstractMailService` — supply only `listMessageIds`, `fetchMessage`, `deleteBatch`, and `batchLimit` (the fetch/delete skeleton is inherited).
-3. Register it in `core.mail.MailServiceFactory`.
-4. Add OAuth endpoints/scopes + help text in `config.ProviderConfigs`.
+1. Add a value to `core.model.Provider` (display name, OAuth endpoints/scopes, whether a secret is needed, help text).
+2. Extend `core.mail.MailService` — pass the delete batch size to `super(...)` and supply `listMessageIds`, `fetchMessage` and `deleteBatch` (the fetch/delete skeleton is inherited).
+3. Add its case to `MailService.of` — the compiler flags the missing case.
 
 No UI changes required — the provider screen, fetch loop, grouping, unsubscribe and delete all work through the interface.
 
@@ -297,19 +295,19 @@ No UI changes required — the provider screen, fetch loop, grouping, unsubscrib
 ```
 src/main/java/com/unsubscribeos/
 ├── Main.java · Launcher.java          # entry points
-├── config/                            # ProviderConfigs, AppPaths, Settings
+├── config/                            # AppPaths, Settings
 ├── core/
 │   ├── model/                         # records: Account, EmailMessage, MailDomain, …
-│   ├── auth/                          # AuthService, *AccountStore, Aes, Pkce, LoopbackOAuth
+│   ├── auth/                          # AuthService, AccountStore, Aes, Pkce, LoopbackOAuth
 │   ├── http/                          # Http, Json, HttpException
-│   ├── mail/                          # MailService, AbstractMailService (+gmail/outlook), ConcurrentFetcher, DomainAggregator …
+│   ├── mail/                          # MailService (+gmail/outlook), UnsubscribeHeaders, FetchContext
 │   ├── unsubscribe/                   # UnsubscribeService, UnsubscribeResult
 │   └── platform/                      # Browser
 └── ui/
     ├── Router · AppContext · Fxml · ThemeManager · Theme · Async · Errors
     ├── view/                          # ProviderView, CredentialsView
-    │   └── dashboard/                 # DashboardView, DomainGrid, DomainCard, EmailRow, DomainSort
-    └── component/                     # Toast, Modal, Tutorial, ProviderLogo, AppIcon, ThemeToggle, HeatScale
+    │   └── dashboard/                 # DashboardView, DomainCard, EmailRow, DomainSort
+    └── component/                     # Toast, Modal, Tutorial, ProviderLogo, ThemeToggle, HeatScale
 src/main/resources/
 ├── css/                               # app.css + theme-dark.css + theme-light.css
 ├── fxml/                              # layout for every screen and widget (one file per controller)

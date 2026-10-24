@@ -37,12 +37,15 @@ public final class Modal {
 
         host.getChildren().add(overlay);
         overlay.requestFocus();
-        fade(overlay, 0, 1, null);
+        overlay.setOpacity(0);
+        fade(overlay, 1).play();
     }
 
     @FXML
     private void dismiss() {
-        fade(overlay, overlay.getOpacity(), 0, () -> host.getChildren().remove(overlay));
+        FadeTransition out = fade(overlay, 0);
+        out.setOnFinished(e -> host.getChildren().remove(overlay));
+        out.play();
     }
 
     @FXML
@@ -55,11 +58,11 @@ public final class Modal {
         if (e.getCode() == KeyCode.ESCAPE) dismiss();
     }
 
-    private static void fade(Node node, double from, double to, Runnable after) {
-        FadeTransition transition = new FadeTransition(Duration.millis(150), node);
-        transition.setFromValue(from);
+    /** A short fade of {@code node} from its current opacity to {@code to}; shared with {@link Toast}. */
+    static FadeTransition fade(Node node, double to) {
+        FadeTransition transition = new FadeTransition(Duration.millis(160), node);
+        transition.setFromValue(node.getOpacity());
         transition.setToValue(to);
-        if (after != null) transition.setOnFinished(e -> after.run());
-        transition.play();
+        return transition;
     }
 }

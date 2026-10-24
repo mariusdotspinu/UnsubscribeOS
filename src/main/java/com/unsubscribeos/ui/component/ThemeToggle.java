@@ -23,7 +23,7 @@ public final class ThemeToggle {
 
     @FXML
     private void initialize() {
-        show(themeManager.current());
+        show(themeManager.themeProperty().get());
         themeManager.themeProperty().addListener((obs, was, now) -> show(now));
     }
 

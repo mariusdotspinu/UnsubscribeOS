@@ -10,15 +10,9 @@ import java.util.Optional;
  */
 public record EmailMessage(
         String id,
-        String fromName,
-        String fromAddress,
         String domain,
         String subject,
         String snippet,
         Instant date,
         Optional<UnsubscribeInfo> unsubscribe) {
-
-    public boolean canUnsubscribe() {
-        return unsubscribe.isPresent();
-    }
 }

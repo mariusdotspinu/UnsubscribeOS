@@ -15,10 +15,15 @@ public record Pkce(String verifier, String challenge) {
     private static final Base64.Encoder URL = Base64.getUrlEncoder().withoutPadding();
 
     public static Pkce create() {
-        byte[] raw = new byte[32];
-        RNG.nextBytes(raw);
-        String verifier = URL.encodeToString(raw);
+        String verifier = random(32);
         return new Pkce(verifier, challenge(verifier));
+    }
+
+    /** {@code bytes} of secure randomness, URL-safe Base64 encoded. */
+    static String random(int bytes) {
+        byte[] raw = new byte[bytes];
+        RNG.nextBytes(raw);
+        return URL.encodeToString(raw);
     }
 
     private static String challenge(String verifier) {

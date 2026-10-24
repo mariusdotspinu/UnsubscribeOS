@@ -1,21 +1,18 @@
 package com.unsubscribeos.ui.view.dashboard;
 
 import com.unsubscribeos.config.Settings;
-import com.unsubscribeos.core.mail.DomainAggregator;
 import com.unsubscribeos.core.mail.FetchContext;
 import com.unsubscribeos.core.mail.MailService;
-import com.unsubscribeos.core.mail.MailServiceFactory;
 import com.unsubscribeos.core.model.Account;
 import com.unsubscribeos.core.model.EmailMessage;
 import com.unsubscribeos.core.model.FetchProgress;
 import com.unsubscribeos.core.model.MailDomain;
 import com.unsubscribeos.ui.AppContext;
+import com.unsubscribeos.ui.Async;
 import com.unsubscribeos.ui.Errors;
-import com.unsubscribeos.ui.Fxml;
 import com.unsubscribeos.ui.Router;
 import com.unsubscribeos.ui.component.Modal;
 import com.unsubscribeos.ui.component.ProviderLogo;
-import com.unsubscribeos.ui.component.ThemeToggle;
 import com.unsubscribeos.ui.component.Toast;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -23,7 +20,6 @@ import javafx.application.Platform;
 import javafx.event.EventTarget;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -39,18 +35,21 @@ import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import javafx.util.StringConverter;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
 
 /**
  * Controller for {@code dashboard.fxml}, the main screen: streams the account's mail off-thread behind a live progress bar, then keeps the
  * view fresh by re-polling every few seconds (fetching only messages not already seen). Senders
  * are grouped, searchable and sortable, and volume-graded by colour. Owns the fetch/poll
  * lifecycle and a shared status line; sign-out cancels everything and returns to the providers.
+ * Reuses one {@link DomainCard} per domain across refreshes, so each render only re-orders existing
+ * nodes and refreshes their contents — preserving expand state instead of rebuilding the list.
  */
 public final class DashboardView {
 
@@ -79,7 +78,6 @@ public final class DashboardView {
     private final Router router;
     private final Account account;
     private final MailService mail;
-    private final DomainGrid grid;
 
     private final AtomicBoolean cancelled = new AtomicBoolean();
     private final AtomicBoolean fetching = new AtomicBoolean();
@@ -92,7 +90,7 @@ public final class DashboardView {
     private final Timeline renderer = new Timeline(new KeyFrame(RENDER_INTERVAL, e -> render()));
     private final Timeline poller = new Timeline(new KeyFrame(POLL_INTERVAL, e -> poll()));
 
-    private final Toast toast = new Toast();
+    private final Map<String, DomainCard> cards = new HashMap<>();
 
     @FXML private StackPane host;
     @FXML private StackPane providerLogo;
@@ -104,6 +102,9 @@ public final class DashboardView {
     @FXML private VBox progressBox;
     @FXML private Label progressLabel;
     @FXML private ProgressBar progressBar;
+    @FXML private VBox list;
+    @FXML private Label message;
+    @FXML private Toast toastController;
 
     // The scroll position the user actually chose, and whether a change to it right now is coming
     // from a real user gesture (so we keep it) rather than a content rebuild (so we undo it).
@@ -114,8 +115,7 @@ public final class DashboardView {
         this.context = context;
         this.router = router;
         this.account = account;
-        this.mail = MailServiceFactory.create(account.provider());
-        this.grid = new DomainGrid(context, account, mail, toast, this::purge);
+        this.mail = MailService.of(account.provider());
     }
 
     /**
@@ -158,10 +158,6 @@ public final class DashboardView {
         return false;
     }
 
-    public Parent build() {
-        return Fxml.load("dashboard.fxml", this, toast, grid, new ThemeToggle(context.themeManager()));
-    }
-
     @FXML
     private void initialize() {
         providerLogo.getChildren().setAll(ProviderLogo.of(account.provider(), 20));
@@ -194,11 +190,7 @@ public final class DashboardView {
      */
     private void initDepthSelector() {
         int current = context.settings().scanDepth();
-        List<Integer> options = new ArrayList<>(List.of(1000, 5000, 15000, 50000));
-        if (!options.contains(current)) options.add(current);
-        options.sort(Integer::compareTo);
-
-        depth.getItems().setAll(options);
+        depth.getItems().setAll(Stream.of(1000, 5000, 15000, 50000, current).distinct().sorted().toList());
         depth.setValue(current);
         depth.setConverter(new StringConverter<>() {
             @Override public String toString(Integer n) { return n == null ? "" : String.format("Scan %,d", n); }
@@ -218,18 +210,10 @@ public final class DashboardView {
         if (initial) showProgress();
         renderer.play();
         int scanDepth = initial ? context.settings().scanDepth() : POLL_DEPTH;
-        Thread.ofVirtual().start(() -> {
-            try {
-                String token = context.authService().accessToken(account);
-                mail.fetch(token, scanDepth, new FetchContext(this::onMessage, this::onProgress,
-                        cancelled::get, id -> !seen.contains(id)));
-                Platform.runLater(() -> onFetchDone(initial));
-            } catch (Exception e) {
-                Platform.runLater(() -> onFetchFailed(e, initial));
-            } finally {
-                fetching.set(false);
-            }
-        });
+        Async.run(() -> mail.fetch(context.authService().accessToken(account), scanDepth,
+                        new FetchContext(this::onMessage, this::onProgress, cancelled::get, id -> !seen.contains(id))),
+                () -> onFetchDone(initial),
+                error -> onFetchFailed(error, initial));
     }
 
     /** Persists a new scan depth and re-scans with it, deeper than the live poll would reach. */
@@ -269,6 +253,7 @@ public final class DashboardView {
     }
 
     private void onFetchDone(boolean initial) {
+        fetching.set(false);
         renderer.stop();
         render();
         if (initial) {
@@ -280,23 +265,49 @@ public final class DashboardView {
     }
 
     private void onFetchFailed(Throwable error, boolean initial) {
+        fetching.set(false);
         renderer.stop();
         if (initial) progressLabel.setText("Couldn't fetch mail: " + Errors.describe(error));
-        else toast.error("Couldn't refresh: " + Errors.describe(error));
+        else toastController.error("Couldn't refresh: " + Errors.describe(error));
         drainRescan();
     }
 
     // ---- rendering: group, search, sort, colour ----------------------------
 
     private void render() {
-        List<MailDomain> all = DomainAggregator.group(new ArrayList<>(collected.values()));
+        List<MailDomain> all = MailDomain.group(collected.values());
         int max = all.stream().mapToInt(MailDomain::count).max().orElse(0);
         List<MailDomain> view = all.stream()
                 .filter(this::matchesSearch)
                 .sorted(sort.getValue().comparator())
                 .toList();
-        if (view.isEmpty()) grid.showMessage(emptyMessage(all.isEmpty()));
-        else grid.update(view, max);
+        if (view.isEmpty()) showMessage(emptyMessage(all.isEmpty()));
+        else showCards(view, max);
+    }
+
+    private void showCards(List<MailDomain> domains, int maxCount) {
+        list.getChildren().setAll(domains.stream().map(domain -> {
+            DomainCard card = cards.computeIfAbsent(domain.domain(), this::createCard);
+            card.update(domain, maxCount);
+            return card.node();
+        }).toList());
+    }
+
+    private void showMessage(String text) {
+        message.setText(text);
+        list.getChildren().setAll(message);
+    }
+
+    private DomainCard createCard(String domain) {
+        DomainCard card = new DomainCard(context, account, mail, domain, toastController, this::purge,
+                () -> removeCard(domain));
+        card.build();
+        return card;
+    }
+
+    private void removeCard(String domain) {
+        DomainCard card = cards.remove(domain);
+        if (card != null) list.getChildren().remove(card.node());
     }
 
     private boolean matchesSearch(MailDomain domain) {

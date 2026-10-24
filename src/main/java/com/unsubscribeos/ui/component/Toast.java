@@ -1,6 +1,6 @@
 package com.unsubscribeos.ui.component;
 
-import javafx.animation.FadeTransition;
+import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -11,11 +11,11 @@ import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 /**
- * Controller for {@code toast.fxml}: a prominent, self-dismissing notification. Each message fades in, shows a draining progress bar
- * for a few seconds, then fades out automatically; a new message restarts the timer, and a click
- * dismisses it early. Implements {@link Notifier} so callers stay unaware of the presentation.
+ * Controller for {@code toast.fxml}: a prominent, self-dismissing notification. Each message fades
+ * in, shows a draining progress bar for a few seconds, then fades out automatically; a new message
+ * restarts the timer, and a click dismisses it early.
  */
-public final class Toast implements Notifier {
+public final class Toast {
 
     /** Severity, mapped to colour and glyph through the CSS classes of the same name. */
     private enum Level {
@@ -31,7 +31,6 @@ public final class Toast implements Notifier {
     }
 
     private static final Duration VISIBLE = Duration.seconds(4);
-    private static final Duration FADE = Duration.millis(180);
 
     @FXML private Label icon;
     @FXML private Label message;
@@ -39,14 +38,15 @@ public final class Toast implements Notifier {
     @FXML private VBox container;
 
     private Timeline countdown;
-    private FadeTransition fade;
+    private Animation fade;
 
-    @Override public void info(String text)    { show(text, Level.INFO); }
-    @Override public void success(String text) { show(text, Level.SUCCESS); }
-    @Override public void error(String text)   { show(text, Level.ERROR); }
+    public void info(String text)    { show(text, Level.INFO); }
+    public void success(String text) { show(text, Level.SUCCESS); }
+    public void error(String text)   { show(text, Level.ERROR); }
 
     private void show(String text, Level level) {
-        stop();
+        if (countdown != null) countdown.stop();
+        if (fade != null) fade.stop();
         message.setText(text);
         icon.setText(level.glyph);
         container.getStyleClass().removeAll("info", "success", "error");
@@ -55,7 +55,7 @@ public final class Toast implements Notifier {
         container.setVisible(true);
         container.setManaged(true);
         container.setOpacity(0);
-        fade = fadeTo(1);
+        fade = Modal.fade(container, 1);
         fade.play();
 
         timer.setProgress(1);
@@ -69,23 +69,11 @@ public final class Toast implements Notifier {
     @FXML
     private void hide() {
         if (countdown != null) countdown.stop();
-        fade = fadeTo(0);
+        fade = Modal.fade(container, 0);
         fade.setOnFinished(e -> {
             container.setVisible(false);
             container.setManaged(false);
         });
         fade.play();
-    }
-
-    private void stop() {
-        if (countdown != null) countdown.stop();
-        if (fade != null) fade.stop();
-    }
-
-    private FadeTransition fadeTo(double to) {
-        FadeTransition transition = new FadeTransition(FADE, container);
-        transition.setFromValue(container.getOpacity());
-        transition.setToValue(to);
-        return transition;
     }
 }

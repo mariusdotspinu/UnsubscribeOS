@@ -11,11 +11,12 @@ import com.unsubscribeos.core.platform.Browser;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
+import java.net.URLDecoder;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -27,7 +28,6 @@ import java.util.concurrent.TimeoutException;
  */
 public final class LoopbackOAuth {
 
-    private static final SecureRandom RNG = new SecureRandom();
     private static final int AUTH_TIMEOUT_MINUTES = 5;
 
     private final OAuthConfig config;
@@ -39,7 +39,7 @@ public final class LoopbackOAuth {
     /** Runs the full interactive sign-in and returns the resulting tokens. Blocking. */
     public TokenSet authorize() {
         Pkce pkce = Pkce.create();
-        String state = randomState();
+        String state = Pkce.random(16);
         HttpServer server = startServer();
         try {
             String redirectUri = "http://localhost:" + server.getAddress().getPort() + "/callback";
@@ -74,20 +74,16 @@ public final class LoopbackOAuth {
     // ---- internals ----------------------------------------------------------
 
     private String authUrl(String redirectUri, String state, Pkce pkce) {
-        Map<String, String> q = new HashMap<>();
-        q.put("client_id", config.clientId());
-        q.put("redirect_uri", redirectUri);
-        q.put("response_type", "code");
-        q.put("scope", config.scopeString());
-        q.put("state", state);
-        q.put("code_challenge", pkce.challenge());
-        q.put("code_challenge_method", "S256");
-        q.put("access_type", "offline");   // Google: ensures a refresh token
-        q.put("prompt", "consent");        // force refresh-token issuance on re-consent
-        String query = q.entrySet().stream()
-                .map(e -> Http.enc(e.getKey()) + "=" + Http.enc(e.getValue()))
-                .reduce((a, b) -> a + "&" + b).orElseThrow();
-        return config.authEndpoint() + "?" + query;
+        return config.authEndpoint() + "?" + Http.query(Map.of(
+                "client_id", config.clientId(),
+                "redirect_uri", redirectUri,
+                "response_type", "code",
+                "scope", config.scopeString(),
+                "state", state,
+                "code_challenge", pkce.challenge(),
+                "code_challenge_method", "S256",
+                "access_type", "offline",   // Google: ensures a refresh token
+                "prompt", "consent"));      // force refresh-token issuance on re-consent
     }
 
     private TokenSet exchangeCode(String code, String redirectUri, Pkce pkce) {
@@ -136,24 +132,14 @@ public final class LoopbackOAuth {
         }
     }
 
-    private static String randomState() {
-        byte[] b = new byte[16];
-        RNG.nextBytes(b);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
-    }
-
     private static Map<String, String> parseQuery(String raw) {
-        Map<String, String> out = new HashMap<>();
-        if (raw == null) return out;
-        for (String pair : raw.split("&")) {
-            int i = pair.indexOf('=');
-            if (i > 0) out.put(urlDecode(pair.substring(0, i)), urlDecode(pair.substring(i + 1)));
-        }
-        return out;
-    }
-
-    private static String urlDecode(String s) {
-        return java.net.URLDecoder.decode(s, StandardCharsets.UTF_8);
+        if (raw == null) return Map.of();
+        return Arrays.stream(raw.split("&"))
+                .filter(pair -> pair.indexOf('=') > 0)
+                .collect(Collectors.toMap(
+                        pair -> URLDecoder.decode(pair.substring(0, pair.indexOf('=')), StandardCharsets.UTF_8),
+                        pair -> URLDecoder.decode(pair.substring(pair.indexOf('=') + 1), StandardCharsets.UTF_8),
+                        (first, repeated) -> repeated));
     }
 
     private static String landingPage(Map<String, String> params) {

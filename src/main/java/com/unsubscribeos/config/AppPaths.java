@@ -1,5 +1,7 @@
 package com.unsubscribeos.config;
 
+import com.unsubscribeos.core.model.Provider;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,24 +29,22 @@ public final class AppPaths {
         return root.resolve("unsubscribeos");
     }
 
-    public static Path dir() {
-        ensureDir();
-        return BASE;
-    }
+    public static Path tokens(Provider provider)      { return file("tokens-" + provider.name().toLowerCase() + ".enc"); }
+    public static Path credentials(Provider provider) { return file("creds-" + provider.name().toLowerCase() + ".enc"); }
+    public static Path keyFile()                       { return file("master.key"); }
+    public static Path settings()                      { return file("settings.properties"); }
 
-    public static Path tokens(String provider)      { return dir().resolve("tokens-" + provider.toLowerCase() + ".enc"); }
-    public static Path credentials(String provider) { return dir().resolve("creds-" + provider.toLowerCase() + ".enc"); }
-    public static Path keyFile()                     { return dir().resolve("master.key"); }
-    public static Path settings()                    { return dir().resolve("settings.properties"); }
-
-    private static void ensureDir() {
+    /** {@code name} inside the app directory, creating the directory owner-only on first use. */
+    private static Path file(String name) {
         try {
-            if (Files.isDirectory(BASE)) return;
-            Files.createDirectories(BASE);
-            trySetOwnerOnly(BASE);
+            if (!Files.isDirectory(BASE)) {
+                Files.createDirectories(BASE);
+                trySetOwnerOnly(BASE);
+            }
         } catch (IOException e) {
             throw new IllegalStateException("Cannot create app directory: " + BASE, e);
         }
+        return BASE.resolve(name);
     }
 
     /** Best-effort 0700/0600 lockdown; silently skipped on non-POSIX filesystems. */

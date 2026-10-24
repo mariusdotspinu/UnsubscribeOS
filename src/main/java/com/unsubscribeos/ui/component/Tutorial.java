@@ -10,11 +10,7 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.VBox;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -38,10 +34,7 @@ public final class Tutorial {
 
     /** Unique URLs found in the text, in first-seen order. Package-private for testing. */
     static List<String> urls(String text) {
-        Set<String> urls = new LinkedHashSet<>();
-        Matcher matcher = URL.matcher(text);
-        while (matcher.find()) urls.add(strip(matcher.group()));
-        return new ArrayList<>(urls);
+        return URL.matcher(text).results().map(match -> strip(match.group())).distinct().toList();
     }
 
     private static List<Hyperlink> links(String text) {

@@ -3,8 +3,7 @@ title Fetch, group & live-poll
 skinparam shadowing false
 participant DashboardView as D
 participant "MailService (Gmail/Outlook)" as M
-participant ConcurrentFetcher as F
-participant DomainAggregator as G
+participant "MailDomain.group" as G
 
 D -> M : fetch(token, depth, ctx) on a virtual thread
 M -> M : list received-mail IDs newest-first (paged, up to depth)
@@ -13,12 +12,12 @@ note right of M
   Outlook: inbox + archive folders, merged
   (no sent / drafts / junk / trash)
 end note
-M -> F : fetch each message concurrently (≤12 in flight)
-F --> D : onMessage(EmailMessage) — every message is kept
-F --> D : onProgress(x / y) — live progress bar
+M -> M : fetch each message concurrently (≤12 in flight)
+M --> D : onMessage(EmailMessage) — every message is kept
+M --> D : onProgress(x / y) — live progress bar
 loop every 250ms while fetching
   D -> G : group all messages by domain
-  G --> D : domains (busiest first)
+  G --> D : domains
   D -> D : apply search + sort + heat colour → render cards
 end
 note over D, M

@@ -19,7 +19,7 @@ class DomainSortTest {
     private static MailDomain domain(String name, int count) {
         List<EmailMessage> messages = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            messages.add(new EmailMessage(name + i, "n", "n@" + name, name, "s", "snip",
+            messages.add(new EmailMessage(name + i, name, "s", "snip",
                     Instant.EPOCH, Optional.empty()));
         }
         return new MailDomain(name, messages);
