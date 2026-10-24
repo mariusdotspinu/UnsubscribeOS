@@ -22,7 +22,7 @@ package "core  (no JavaFX)" {
   component Aes
   component Pkce
   component LoopbackOAuth
-  abstract MailService
+  component MailService <<abstract>>
   component GmailService
   component OutlookService
   component UnsubscribeService
