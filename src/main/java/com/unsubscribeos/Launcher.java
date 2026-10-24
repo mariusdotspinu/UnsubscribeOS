@@ -18,11 +18,6 @@ import javafx.stage.Stage;
 import java.util.Arrays;
 import java.util.Optional;
 
-/**
- * Application entry point. Wires the service graph, opens the window on the provider screen,
- * then asynchronously restores any saved account so a returning user lands straight on their
- * dashboard — staying signed in until they explicitly sign out.
- */
 public final class Launcher extends Application {
 
     private static final double WIDTH = 1024;
@@ -46,7 +41,7 @@ public final class Launcher extends Application {
 
         Async.supply(() -> restoreSession(authService),
                 session -> session.ifPresent(router::toDashboard),
-                error -> { /* no/expired session — stay on the provider screen */ });
+                error -> { });
 
         stage.setTitle("UnsubscribeOS");
         stage.getIcons().setAll(new Image(Launcher.class.getResource("/icon.png").toExternalForm()));
@@ -56,7 +51,6 @@ public final class Launcher extends Application {
         stage.show();
     }
 
-    /** First provider with a persisted, refreshable account — the user's last session. */
     private Optional<Account> restoreSession(AuthService authService) {
         return Arrays.stream(Provider.values())
                 .map(authService::restore)

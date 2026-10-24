@@ -3,7 +3,6 @@ package com.unsubscribeos.core.http;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-/** Thin shared Jackson facade. Tree-model parsing keeps provider mapping explicit and dependency-free. */
 public final class Json {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

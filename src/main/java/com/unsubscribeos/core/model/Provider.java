@@ -2,10 +2,6 @@ package com.unsubscribeos.core.model;
 
 import java.util.List;
 
-/**
- * A supported mail provider: its OAuth endpoints and scopes, plus the help shown while the user
- * creates their own OAuth client. Adding a provider is an entry here and a {@code MailService}.
- */
 public enum Provider {
     GMAIL("Gmail",
             "https://accounts.google.com/o/oauth2/v2/auth",
@@ -62,7 +58,6 @@ public enum Provider {
     public boolean requiresSecret() { return requiresSecret; }
     public String helpText()        { return helpText; }
 
-    /** This provider's endpoints combined with the user's own OAuth client credentials. */
     public OAuthConfig oauth(String clientId, String clientSecret) {
         return new OAuthConfig(clientId, clientSecret, authEndpoint, tokenEndpoint, scopes);
     }

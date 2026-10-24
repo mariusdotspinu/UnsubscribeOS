@@ -1,6 +1,5 @@
 package com.unsubscribeos.ui;
 
-/** The two visual themes, each backed by a palette stylesheet and a toggle glyph. */
 public enum Theme {
     DARK("/css/theme-dark.css", "☀", "Switch to light theme"),
     LIGHT("/css/theme-light.css", "☾", "Switch to dark theme");

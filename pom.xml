@@ -21,9 +21,7 @@
     </properties>
 
     <dependencies>
-        <!-- JavaFX classes live only in the platform-classified jars. Declare them directly with an
-             explicit classifier (see the javafx-* profiles below) rather than relying on OpenJFX's
-             own POMs to interpolate ${javafx.platform} transitively, which is not reliable on CI. -->
+        <!-- Declared per platform classifier: OpenJFX's transitive ${javafx.platform} is unreliable on CI. -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
@@ -63,8 +61,7 @@
         </dependency>
     </dependencies>
 
-    <!-- Pick the JavaFX natives for the machine doing the build (each installer is built on its own
-         OS). Override with -Djavafx.platform=win|mac|mac-aarch64|linux|linux-aarch64 to cross-build. -->
+    <!-- Natives for the build machine; override with -Djavafx.platform=win|mac|mac-aarch64|linux|linux-aarch64. -->
     <profiles>
         <profile>
             <id>javafx-linux</id>
@@ -116,7 +113,6 @@
                 </configuration>
             </plugin>
 
-            <!-- Fat/runnable jar with all dependencies bundled. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

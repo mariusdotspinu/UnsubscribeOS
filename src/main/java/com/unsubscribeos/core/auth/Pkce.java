@@ -5,10 +5,6 @@ import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-/**
- * RFC 7636 PKCE pair. The verifier is a high-entropy secret kept in memory; the S256
- * challenge is what travels in the authorization URL, so an intercepted code is useless.
- */
 public record Pkce(String verifier, String challenge) {
 
     private static final SecureRandom RNG = new SecureRandom();
@@ -19,7 +15,6 @@ public record Pkce(String verifier, String challenge) {
         return new Pkce(verifier, challenge(verifier));
     }
 
-    /** {@code bytes} of secure randomness, URL-safe Base64 encoded. */
     static String random(int bytes) {
         byte[] raw = new byte[bytes];
         RNG.nextBytes(raw);

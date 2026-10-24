@@ -1,9 +1,5 @@
 package com.unsubscribeos.ui.component;
 
-/**
- * Maps a domain's email volume to a heat CSS class relative to the busiest domain:
- * {@code heat-0} (dark red, most) through {@code heat-5} (dark green, fewest).
- */
 public final class HeatScale {
 
     private static final double[] THRESHOLDS = {0.80, 0.55, 0.35, 0.20, 0.08};

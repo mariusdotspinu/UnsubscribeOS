@@ -4,7 +4,6 @@
 <?import javafx.scene.shape.Line?>
 <?import javafx.scene.shape.Rectangle?>
 
-<!-- Gmail badge on a 48×48 grid: a white tile with the four-colour envelope "M". -->
 <Group xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
     <Rectangle width="48" height="48" arcWidth="14" arcHeight="14" fill="WHITE" stroke="#dadce0" strokeWidth="1"/>
     <Line startX="11" startY="35" endX="11" endY="14" stroke="#4285F4" strokeWidth="5" strokeLineCap="ROUND"/>

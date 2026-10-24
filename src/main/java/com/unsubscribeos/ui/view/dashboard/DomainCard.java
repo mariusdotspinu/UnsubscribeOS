@@ -21,13 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * Controller for {@code domain-card.fxml}: one expandable sender-domain card. Built once, then {@link #update} refreshes it in place as
- * the live fetch streams in — keeping its count, heat colour and ordering current without losing
- * the user's expand / "show more" state. Exposes unsubscribe / delete actions for the whole
- * sender and per-email deletion; deletions are purged from the shared buffer so re-grouping stays
- * consistent.
- */
 final class DomainCard {
 
     static final int INITIAL = 5;
@@ -77,28 +70,22 @@ final class DomainCard {
         domainName.setText(domain);
     }
 
-    /** Replaces this card's contents with the latest snapshot for the domain. */
     void update(MailDomain snapshot, int maxCount) {
         messages = new ArrayList<>(snapshot.messages());
         countBadge.setText(String.valueOf(messages.size()));
 
-        // Same heat grade drives the left bar (background) and the count badge (so volume stays
-        // visible at a glance even when the list is sorted by name rather than by count).
         String heatClass = HeatScale.classFor(messages.size(), maxCount);
         heat.getStyleClass().removeIf(c -> c.startsWith("heat-"));
         heat.getStyleClass().add(heatClass);
         countBadge.getStyleClass().removeIf(c -> c.startsWith("vol-"));
         countBadge.getStyleClass().add(heatClass.replace("heat", "vol"));
 
-        // Only senders that actually offer an unsubscribe get the button; the rest are delete-only.
         boolean canUnsubscribe = snapshot.bestUnsubscribe().isPresent();
         unsubscribeButton.setVisible(canUnsubscribe);
         unsubscribeButton.setManaged(canUnsubscribe);
 
         if (expanded) renderRows();
     }
-
-    // ---- header -------------------------------------------------------------
 
     @FXML
     private void toggle() {
@@ -109,15 +96,10 @@ final class DomainCard {
         emailBox.setManaged(expanded);
     }
 
-    // ---- email rows ---------------------------------------------------------
-
     @FXML
     private void showMore() {
         int from = Math.min(shown, messages.size());
         shown = Math.min(shown + PAGE, messages.size());
-        // Insert the freshly revealed rows before the "Show more" button without removing it, then
-        // drop the button once the last row is shown. (The scrollbar is kept steady globally by the
-        // dashboard's scroll keeper.)
         int insertAt = emailBox.getChildren().indexOf(moreButton);
         emailBox.getChildren().addAll(insertAt < 0 ? emailBox.getChildren().size() : insertAt, rows(from, shown));
         if (shown >= messages.size()) emailBox.getChildren().remove(moreButton);
@@ -134,8 +116,6 @@ final class DomainCard {
                 .map(message -> new EmailRow(message, () -> deleteEmail(message)).build())
                 .toList();
     }
-
-    // ---- actions ------------------------------------------------------------
 
     @FXML
     private void unsubscribe() {

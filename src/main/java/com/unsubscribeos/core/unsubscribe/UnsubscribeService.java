@@ -6,11 +6,6 @@ import com.unsubscribeos.core.platform.Browser;
 
 import java.util.Optional;
 
-/**
- * Executes List-Unsubscribe instructions, preferring the safest automatic path: a silent RFC 8058
- * one-click HTTPS POST, else the unsubscribe web page, else a pre-filled mail draft.
- * Provider-independent by design.
- */
 public final class UnsubscribeService {
 
     private static final String ONE_CLICK_BODY = "List-Unsubscribe=One-Click";

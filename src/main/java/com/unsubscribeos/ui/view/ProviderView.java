@@ -6,10 +6,6 @@ import com.unsubscribeos.ui.component.ProviderLogo;
 import javafx.fxml.FXML;
 import javafx.scene.layout.StackPane;
 
-/**
- * Controller for {@code provider.fxml}, the first screen: pick the mail provider to connect.
- * The single entry into the sign-in flow.
- */
 public final class ProviderView {
 
     private final Router router;

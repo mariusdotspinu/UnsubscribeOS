@@ -5,10 +5,6 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.Scene;
 
-/**
- * Owns the active {@link Theme}, applies its stylesheets to the scene, and persists the
- * choice. Exposes an observable property so theme toggle buttons across views stay in sync.
- */
 public final class ThemeManager {
 
     private static final String APP_CSS = "/css/app.css";

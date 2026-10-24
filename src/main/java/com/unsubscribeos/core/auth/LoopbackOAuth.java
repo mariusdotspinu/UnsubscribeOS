@@ -21,11 +21,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-/**
- * OAuth 2.0 Authorization Code flow with PKCE over a 127.0.0.1 loopback redirect — the
- * recommended pattern for native desktop apps. No embedded browser, no listening on a
- * public interface, and the authorization code is bound to a one-time PKCE verifier.
- */
 public final class LoopbackOAuth {
 
     private static final int AUTH_TIMEOUT_MINUTES = 5;
@@ -36,7 +31,6 @@ public final class LoopbackOAuth {
         this.config = config;
     }
 
-    /** Runs the full interactive sign-in and returns the resulting tokens. Blocking. */
     public TokenSet authorize() {
         Pkce pkce = Pkce.create();
         String state = Pkce.random(16);
@@ -62,7 +56,6 @@ public final class LoopbackOAuth {
         }
     }
 
-    /** Exchanges a stored refresh token for a fresh access token. */
     public TokenSet refresh(String refreshToken) {
         Map<String, String> form = baseForm();
         form.put("grant_type", "refresh_token");
@@ -70,8 +63,6 @@ public final class LoopbackOAuth {
         if (!config.scopes().isEmpty()) form.put("scope", config.scopeString());
         return parseTokens(Json.parse(Http.postForm(config.tokenEndpoint(), form)));
     }
-
-    // ---- internals ----------------------------------------------------------
 
     private String authUrl(String redirectUri, String state, Pkce pkce) {
         return config.authEndpoint() + "?" + Http.query(Map.of(
@@ -162,7 +153,6 @@ public final class LoopbackOAuth {
             exchange.sendResponseHeaders(200, bytes.length);
             os.write(bytes);
         } catch (Exception ignored) {
-            // client closed; nothing actionable
         }
     }
 }

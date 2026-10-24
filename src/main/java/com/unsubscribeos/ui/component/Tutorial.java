@@ -13,11 +13,6 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 import java.util.regex.Pattern;
 
-/**
- * Controller for {@code tutorial.fxml}: instructional text the user can read, select and copy,
- * with any embedded URLs surfaced beneath as clickable links that open in the system browser.
- * Hosts {@code fx:include} it and hand it its text through {@link #setText}.
- */
 public final class Tutorial {
 
     private static final Pattern URL = Pattern.compile("https?://\\S+");
@@ -32,7 +27,6 @@ public final class Tutorial {
         box.getChildren().addAll(links(text));
     }
 
-    /** Unique URLs found in the text, in first-seen order. Package-private for testing. */
     static List<String> urls(String text) {
         return URL.matcher(text).results().map(match -> strip(match.group())).distinct().toList();
     }
@@ -48,7 +42,6 @@ public final class Tutorial {
         return link;
     }
 
-    /** Opens the link, or — if no browser can be launched — copies it to the clipboard. */
     private static void openOrCopy(Hyperlink link, String url) {
         try {
             Browser.open(url);
@@ -60,7 +53,6 @@ public final class Tutorial {
         }
     }
 
-    /** Drops trailing sentence punctuation that the greedy match may have swept up. */
     private static String strip(String url) {
         int end = url.length();
         while (end > 0 && ".,);:".indexOf(url.charAt(end - 1)) >= 0) end--;

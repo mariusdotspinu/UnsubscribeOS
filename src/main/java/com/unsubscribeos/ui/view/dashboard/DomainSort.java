@@ -4,7 +4,6 @@ import com.unsubscribeos.core.model.MailDomain;
 
 import java.util.Comparator;
 
-/** The orderings offered by the dashboard's sort control (Strategy pattern via comparators). */
 enum DomainSort {
 
     MOST_EMAILS("Most emails",

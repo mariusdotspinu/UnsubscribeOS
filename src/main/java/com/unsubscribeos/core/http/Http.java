@@ -1,5 +1,7 @@
 package com.unsubscribeos.core.http;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -11,11 +13,6 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-/**
- * Small wrapper over the JDK {@link HttpClient}. Uses a virtual-thread executor so the
- * many concurrent message fetches stay cheap, and centralises bearer auth, form encoding
- * and error mapping for every provider.
- */
 public final class Http {
 
     private static final HttpClient CLIENT = HttpClient.newBuilder()
@@ -45,7 +42,6 @@ public final class Http {
                 .build());
     }
 
-    /** Fire-and-forget HTTPS POST used for RFC 8058 one-click unsubscribe; returns status code. */
     public static int postRaw(String url, String contentType, String body) {
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(url))
@@ -55,7 +51,7 @@ public final class Http {
                     .build();
             return CLIENT.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
         } catch (Exception e) {
-            throw new HttpException("POST " + url + " failed: " + e.getMessage(), e);
+            throw new HttpException("Couldn't reach " + URI.create(url).getHost(), e);
         }
     }
 
@@ -70,15 +66,26 @@ public final class Http {
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             int code = response.statusCode();
             if (code >= 200 && code < 300) return response.body();
-            throw new HttpException("HTTP " + code + " for " + request.uri() + ": " + response.body(), code);
+            String reason = reason(response.body());
+            throw new HttpException("HTTP " + code + (reason.isEmpty() ? "" : ": " + reason), code);
         } catch (HttpException e) {
             throw e;
         } catch (Exception e) {
-            throw new HttpException("Request failed: " + request.uri() + " — " + e.getMessage(), e);
+            throw new HttpException("Couldn't reach " + request.uri().getHost(), e);
         }
     }
 
-    /** URL-encodes {@code params} as {@code k=v&k=v}, for a query string or a form body. */
+    // Google/Graph nest {"error":{"message"}}; OAuth token errors use error_description or a bare error.
+    static String reason(String body) {
+        try {
+            JsonNode json = Json.parse(body), error = json.path("error");
+            String text = json.path("error_description").asText(error.path("message").asText(error.asText("")));
+            return text.split("(?<=\\.)\\s", 2)[0].trim();
+        } catch (RuntimeException notJson) {
+            return "";
+        }
+    }
+
     public static String query(Map<String, String> params) {
         return params.entrySet().stream()
                 .map(e -> enc(e.getKey()) + "=" + enc(e.getValue()))

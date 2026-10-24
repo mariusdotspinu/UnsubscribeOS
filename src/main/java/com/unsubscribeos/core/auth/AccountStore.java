@@ -16,16 +16,9 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 
-/**
- * Persists signed-in accounts and remembered credentials, each AES-256-GCM encrypted under a
- * per-install master key, all written owner-only in the app config directory. This keeps
- * credentials and tokens out of plaintext on disk; a local attacker already running as the user is
- * trusted, matching a single-user desktop app's threat model. Remembered credentials live in their
- * own file so they survive sign-out, which clears only the session.
- */
 public final class AccountStore {
 
-    /** The session as stored on disk; the component names are the persisted JSON keys. */
+    // Component names are the on-disk JSON keys; renaming them breaks saved sessions.
     private record Session(String clientId, String clientSecret, String access, String refresh, long exp) {}
 
     private final SecretKey masterKey = loadOrCreateKey();
@@ -62,7 +55,7 @@ public final class AccountStore {
         try {
             return Optional.of(Json.read(new String(Aes.decrypt(masterKey, Files.readAllBytes(file))), type));
         } catch (Exception e) {
-            return Optional.empty(); // unreadable ⇒ treat as signed out / not remembered
+            return Optional.empty();
         }
     }
 

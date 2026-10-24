@@ -8,11 +8,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Parses the RFC 2369 {@code List-Unsubscribe} header (one or more angle-bracketed URIs)
- * together with the RFC 8058 {@code List-Unsubscribe-Post} header that signals one-click
- * HTTPS unsubscribe support.
- */
 public final class UnsubscribeHeaders {
 
     private static final Pattern URI = Pattern.compile("<([^>]+)>");
@@ -30,9 +25,7 @@ public final class UnsubscribeHeaders {
             bracketed = true;
             classify(m.group(1).trim(), http, mailto);
         }
-        // Some senders ignore RFC 2369 and omit the angle brackets, sending a bare or
-        // comma-separated value (e.g. "List-Unsubscribe: https://…, mailto:…"). Without this
-        // fallback those senders would look like they offer no unsubscribe option at all.
+        // Some senders omit RFC 2369's angle brackets; accept bare or comma-separated URIs.
         if (!bracketed) {
             for (String token : listUnsubscribe.split("[,\\s]+")) classify(token.trim(), http, mailto);
         }

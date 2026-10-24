@@ -18,9 +18,9 @@ class HeatScaleTest {
 
     @Test
     void gradesByRatioToBusiest() {
-        assertEquals("heat-1", HeatScale.classFor(60, 100));  // 0.60 >= 0.55
-        assertEquals("heat-2", HeatScale.classFor(40, 100));  // 0.40 >= 0.35
-        assertEquals("heat-4", HeatScale.classFor(10, 100));  // 0.10 >= 0.08
+        assertEquals("heat-1", HeatScale.classFor(60, 100));
+        assertEquals("heat-2", HeatScale.classFor(40, 100));
+        assertEquals("heat-4", HeatScale.classFor(10, 100));
     }
 
     @Test

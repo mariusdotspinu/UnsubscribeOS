@@ -8,11 +8,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
 
-/**
- * Resolves and lazily creates the per-user application data directory and the files
- * UnsubscribeOS persists there (encrypted tokens, encryption key, settings).
- * The directory is locked down to the owner on POSIX systems.
- */
 public final class AppPaths {
 
     private static final Path BASE = resolveBase();
@@ -34,7 +29,6 @@ public final class AppPaths {
     public static Path keyFile()                       { return file("master.key"); }
     public static Path settings()                      { return file("settings.properties"); }
 
-    /** {@code name} inside the app directory, creating the directory owner-only on first use. */
     private static Path file(String name) {
         try {
             if (!Files.isDirectory(BASE)) {
@@ -47,7 +41,6 @@ public final class AppPaths {
         return BASE.resolve(name);
     }
 
-    /** Best-effort 0700/0600 lockdown; silently skipped on non-POSIX filesystems. */
     public static void trySetOwnerOnly(Path path) {
         try {
             boolean isDir = Files.isDirectory(path);
@@ -55,7 +48,7 @@ public final class AppPaths {
                     ? Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
                     : Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
         } catch (UnsupportedOperationException | IOException ignored) {
-            // Non-POSIX (e.g. Windows) — directory ACLs already default to the user.
+        // Non-POSIX (Windows): ACLs already default to the user.
         }
     }
 }

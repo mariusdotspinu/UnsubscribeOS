@@ -7,11 +7,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
 import java.util.Arrays;
 
-/**
- * AES-256-GCM authenticated encryption. The 12-byte random IV is prepended to the
- * ciphertext so a single opaque blob round-trips, and GCM's tag protects against
- * tampering of the stored token file.
- */
 public final class Aes {
 
     private static final String TRANSFORM = "AES/GCM/NoPadding";

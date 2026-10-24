@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 
-/** Opens URLs (and mailto: links) in the user's default application, cross-platform incl. WSL. */
 public final class Browser {
 
     private Browser() {}
@@ -25,7 +24,6 @@ public final class Browser {
                 return true;
             }
         } catch (Exception ignored) {
-            // fall through to an OS launcher
         }
         return false;
     }
@@ -37,7 +35,6 @@ public final class Browser {
         throw new IllegalStateException("No browser launcher available for: " + uri);
     }
 
-    /** Candidate launchers in priority order; the first one present on the system wins. */
     private static List<String[]> launchers(String uri) {
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
@@ -46,7 +43,6 @@ public final class Browser {
         if (os.contains("mac")) {
             return List.<String[]>of(new String[]{"open", uri});
         }
-        // Linux and WSL: native openers first, then Windows interop so WSL still opens a browser.
         return List.of(
                 new String[]{"xdg-open", uri},
                 new String[]{"gio", "open", uri},
@@ -60,7 +56,7 @@ public final class Browser {
             new ProcessBuilder(command).start();
             return true;
         } catch (IOException e) {
-            return false; // launcher not installed — try the next candidate
+            return false;
         }
     }
 }

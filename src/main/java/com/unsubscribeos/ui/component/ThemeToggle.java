@@ -6,10 +6,6 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 
-/**
- * Controller for {@code theme-toggle.fxml}, the theme switch shared by every screen; its glyph
- * follows the active theme. Supply an instance to the view's loader so the include picks it up.
- */
 public final class ThemeToggle {
 
     private final ThemeManager themeManager;

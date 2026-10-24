@@ -6,7 +6,6 @@ import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 
-/** Controller for {@code email-row.fxml}: one email inside an expanded {@link DomainCard}. */
 final class EmailRow {
 
     private final EmailMessage message;

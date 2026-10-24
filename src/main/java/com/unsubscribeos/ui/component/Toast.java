@@ -10,14 +10,8 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
-/**
- * Controller for {@code toast.fxml}: a prominent, self-dismissing notification. Each message fades
- * in, shows a draining progress bar for a few seconds, then fades out automatically; a new message
- * restarts the timer, and a click dismisses it early.
- */
 public final class Toast {
 
-    /** Severity, mapped to colour and glyph through the CSS classes of the same name. */
     private enum Level {
         INFO("info", "ℹ"), SUCCESS("success", "✓"), ERROR("error", "⚠");
 

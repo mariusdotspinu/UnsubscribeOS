@@ -14,12 +14,10 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<!-- The StackPane root is the host the About modal is layered onto. -->
 <StackPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
            fx:controller="com.unsubscribeos.ui.view.dashboard.DashboardView"
            fx:id="host">
     <fx:define>
-        <!-- Shown in `list` instead of cards while there is nothing to list. -->
         <Label fx:id="message" styleClass="muted"/>
     </fx:define>
     <BorderPane styleClass="root">

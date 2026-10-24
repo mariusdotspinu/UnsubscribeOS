@@ -13,17 +13,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Gmail REST v1 provider. Lists recent received-mail ids (paged), fetches metadata for each
- * concurrently, and trashes via {@code batchModify} (adding the TRASH label) — permitted under
- * the {@code gmail.modify} scope and recoverable. The fetch/delete skeleton lives in
- * {@link MailService}; this class supplies only the Gmail specifics.
- */
 public final class GmailService extends MailService {
 
     private static final String BASE = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
-    // Every message anyone sent us: spam/trash are excluded by default, and we skip our own
-    // sent/chat mail, which would otherwise group under our own domain.
+    // Excludes our own sent/chat mail, which would group under our own domain.
     private static final String QUERY = "-in:sent -in:chats";
     private static final String METADATA = "?format=metadata" + List.of("From", "Subject", "Date",
             "List-Unsubscribe", "List-Unsubscribe-Post").stream()

@@ -11,12 +11,6 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.StackPane;
 import javafx.util.Duration;
 
-/**
- * Controller for {@code modal.fxml}: a lightweight in-scene modal — a dimmed backdrop over the
- * host with a centered, themed card. Dismisses on the close button, a click outside the card, or
- * Escape. Rendered inside the scene (rather than a separate Stage) so it inherits the app theme
- * and avoids window-manager quirks.
- */
 public final class Modal {
 
     private final StackPane host;
@@ -58,7 +52,6 @@ public final class Modal {
         if (e.getCode() == KeyCode.ESCAPE) dismiss();
     }
 
-    /** A short fade of {@code node} from its current opacity to {@code to}; shared with {@link Toast}. */
     static FadeTransition fade(Node node, double to) {
         FadeTransition transition = new FadeTransition(Duration.millis(160), node);
         transition.setFromValue(node.getOpacity());

@@ -7,12 +7,7 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 
-/**
- * Loads the views under {@code /fxml}. FXML owns the layout; the Java class named by
- * {@code fx:controller} owns the behaviour. Controllers that need runtime state (services, the
- * signed-in account, …) are built by the caller and passed in; any other controller — including
- * those of {@code fx:include}d files — is created through its no-arg constructor.
- */
+/** Controllers passed in are used for their {@code fx:controller} type; others use their no-arg constructor. */
 public final class Fxml {
 
     private Fxml() {}

@@ -18,11 +18,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-/**
- * Controller for {@code credentials.fxml}, the second screen: a collapsible guide on creating the
- * provider's OAuth client, the credential fields, and the sign-in action. Sign-in runs off the UI
- * thread and lands on the dashboard.
- */
 public final class CredentialsView {
 
     private final AppContext context;

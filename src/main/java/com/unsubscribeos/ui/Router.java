@@ -8,10 +8,6 @@ import com.unsubscribeos.ui.view.ProviderView;
 import com.unsubscribeos.ui.view.dashboard.DashboardView;
 import javafx.scene.Scene;
 
-/**
- * Single navigation point between the app's screens. Loads each screen's FXML with its
- * controller (plus the shared theme toggle), so views never reference one another directly.
- */
 public final class Router {
 
     private final Scene scene;

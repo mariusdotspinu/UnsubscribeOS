@@ -27,7 +27,6 @@ class UnsubscribeHeadersTest {
 
     @Test
     void parsesBareValueWithoutAngleBrackets() {
-        // Non-RFC-compliant senders (the cause of "has unsubscribe but app misses it") omit the <>.
         UnsubscribeInfo info = UnsubscribeHeaders.parse("https://x.com/unsub?token=abc", null, "x.com")
                 .orElseThrow();
         assertEquals("https://x.com/unsub?token=abc", info.firstHttpUrl().orElseThrow());

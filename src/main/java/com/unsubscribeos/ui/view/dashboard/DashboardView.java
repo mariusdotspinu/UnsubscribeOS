@@ -43,22 +43,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
-/**
- * Controller for {@code dashboard.fxml}, the main screen: streams the account's mail off-thread behind a live progress bar, then keeps the
- * view fresh by re-polling every few seconds (fetching only messages not already seen). Senders
- * are grouped, searchable and sortable, and volume-graded by colour. Owns the fetch/poll
- * lifecycle and a shared status line; sign-out cancels everything and returns to the providers.
- * Reuses one {@link DomainCard} per domain across refreshes, so each render only re-orders existing
- * nodes and refreshes their contents — preserving expand state instead of rebuilding the list.
- */
 public final class DashboardView {
 
     private static final Duration RENDER_INTERVAL = Duration.millis(250);
     private static final Duration POLL_INTERVAL = Duration.seconds(5);
 
-    // The initial fetch scans deep (configurable) to find as many senders as possible; the live
-    // poll only needs to notice newly-arrived mail, so it re-lists just the newest few hundred —
-    // keeping each tick cheap no matter how deep the initial scan is set.
+    // Polls only need to notice new mail, so they re-list just the newest few hundred.
     private static final int POLL_DEPTH = 500;
 
     private static final String ABOUT = """
@@ -82,8 +72,7 @@ public final class DashboardView {
     private final AtomicBoolean cancelled = new AtomicBoolean();
     private final AtomicBoolean fetching = new AtomicBoolean();
     private final AtomicBoolean pendingRescan = new AtomicBoolean();
-    // Every id we've already fetched, so polls never fetch one twice; deleting purges the message
-    // from `collected` but deliberately leaves its id here, so a straggling poll can't resurrect it.
+    // Deleted ids stay here so a straggling poll can't resurrect them.
     private final Set<String> seen = ConcurrentHashMap.newKeySet();
     private final Map<String, EmailMessage> collected = new ConcurrentHashMap<>();
 
@@ -106,8 +95,6 @@ public final class DashboardView {
     @FXML private Label message;
     @FXML private Toast toastController;
 
-    // The scroll position the user actually chose, and whether a change to it right now is coming
-    // from a real user gesture (so we keep it) rather than a content rebuild (so we undo it).
     private double desiredScroll;
     private boolean userScrolling;
 
@@ -118,14 +105,7 @@ public final class DashboardView {
         this.mail = MailService.of(account.provider());
     }
 
-    /**
-     * Keeps the scrollbar wherever the user left it, no matter what changes the content. Live polls,
-     * expanding a card, deleting, and "show more" all rebuild nodes — and that (plus focus moving to
-     * a removed button) otherwise snaps the viewport to the top. Rather than wrap each mutation, we
-     * watch {@code vvalue} globally: the user's own scrolling (mouse wheel, scrollbar drag/click) is
-     * the source of truth and is remembered; any other change to the position is undone immediately,
-     * synchronously, so there's no timing window for a jump to slip through.
-     */
+    /** Keeps the user's scroll position: content rebuilds snap it to the top, so non-user changes are undone. */
     private void installScrollKeeper() {
         scroll.addEventFilter(ScrollEvent.SCROLL, e -> markUserScroll());
         scroll.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> { if (onScrollBar(e.getTarget())) markUserScroll(); });
@@ -144,7 +124,6 @@ public final class DashboardView {
         };
     }
 
-    /** Marks the current pulse as user-driven so the scroll it produces is kept, not reverted. */
     private void markUserScroll() {
         userScrolling = true;
         Platform.runLater(() -> userScrolling = false);
@@ -170,8 +149,6 @@ public final class DashboardView {
         startFetch(true);
     }
 
-    // ---- toolbar: search + sort --------------------------------------------
-
     private void initToolBar() {
         search.textProperty().addListener((obs, was, now) -> render());
 
@@ -182,12 +159,7 @@ public final class DashboardView {
         initDepthSelector();
     }
 
-    /**
-     * "How deep to scan" selector. Listing the current saved depth (even if it isn't a preset, e.g.
-     * hand-edited in settings.properties) keeps it as the selected value. Changing it persists the
-     * choice and re-scans; the listener is wired only after the initial value is set, so simply
-     * opening the dashboard never triggers a spurious re-scan.
-     */
+    /** The listener is added last so setting the initial value doesn't trigger a re-scan. */
     private void initDepthSelector() {
         int current = context.settings().scanDepth();
         depth.getItems().setAll(Stream.of(1000, 5000, 15000, 50000, current).distinct().sorted().toList());
@@ -198,8 +170,6 @@ public final class DashboardView {
         });
         depth.valueProperty().addListener((obs, was, now) -> changeDepth(now));
     }
-
-    // ---- fetch + 5s poll ----------------------------------------------------
 
     private void poll() {
         if (!cancelled.get()) startFetch(false);
@@ -216,7 +186,6 @@ public final class DashboardView {
                 error -> onFetchFailed(error, initial));
     }
 
-    /** Persists a new scan depth and re-scans with it, deeper than the live poll would reach. */
     private void changeDepth(Integer value) {
         if (value == null) return;
         context.settings().put(Settings.SCAN_DEPTH, String.valueOf(value));
@@ -224,10 +193,7 @@ public final class DashboardView {
         drainRescan();
     }
 
-    /**
-     * Starts a queued deep re-scan once no fetch is in flight. Called both right when the depth
-     * changes and again when any fetch completes, so a re-scan requested mid-poll still runs.
-     */
+    /** Also called when any fetch completes, so a re-scan requested mid-poll still runs. */
     private void drainRescan() {
         if (cancelled.get() || fetching.get()) return;
         if (pendingRescan.compareAndSet(true, false)) startFetch(true);
@@ -257,8 +223,7 @@ public final class DashboardView {
         renderer.stop();
         render();
         if (initial) {
-            progressBox.setVisible(false);
-            progressBox.setManaged(false);
+            hideProgress();
             poller.play();
         }
         drainRescan();
@@ -267,12 +232,18 @@ public final class DashboardView {
     private void onFetchFailed(Throwable error, boolean initial) {
         fetching.set(false);
         renderer.stop();
-        if (initial) progressLabel.setText("Couldn't fetch mail: " + Errors.describe(error));
-        else toastController.error("Couldn't refresh: " + Errors.describe(error));
+        if (initial) hideProgress();
+        render();
+        String reason = "Couldn't fetch mail: " + Errors.describe(error);
+        if (collected.isEmpty()) showMessage(reason);
+        else toastController.error(reason);
         drainRescan();
     }
 
-    // ---- rendering: group, search, sort, colour ----------------------------
+    private void hideProgress() {
+        progressBox.setVisible(false);
+        progressBox.setManaged(false);
+    }
 
     private void render() {
         List<MailDomain> all = MailDomain.group(collected.values());
@@ -323,8 +294,6 @@ public final class DashboardView {
     private void purge(List<String> ids) {
         ids.forEach(collected::remove);
     }
-
-    // ---- chrome -------------------------------------------------------------
 
     @FXML
     private void showAbout() {

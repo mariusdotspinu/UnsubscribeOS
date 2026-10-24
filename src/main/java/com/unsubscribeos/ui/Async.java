@@ -5,10 +5,6 @@ import javafx.application.Platform;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/**
- * Runs blocking work (OAuth, network, mail I/O) on a virtual thread and delivers the result
- * back on the JavaFX application thread, so views never block the UI nor touch it off-thread.
- */
 public final class Async {
 
     private Async() {}
